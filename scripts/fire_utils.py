@@ -405,7 +405,7 @@ def seas_burnarea(firefile, season, regindx, start_year= 1984, final_year= 2019)
     
     return burnarea_arr
 
-def fire_tim_ind_func(filepath, start_year= 1984, final_year= 2019, antecedent= False, mov_avg= False):
+def fire_tim_ind_func(filepath, start_year= 1984, final_year= 2019, antecedent= False, mov_avg= False, pred_mon_ind= None):
     
     # returns the indices for climate predictor variables corresponding to the wildfire time series
     
@@ -422,9 +422,13 @@ def fire_tim_ind_func(filepath, start_year= 1984, final_year= 2019, antecedent= 
         fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 2, 12, 15, 0, 0, 0, 0)) \
                                 & (clim_dates.data < DatetimeGregorian(final_year + 1, 1, 15, 0, 0, 0, 0))
     else:
-        fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 1, 12, 15, 0, 0, 0, 0)) \
+        if pred_mon_ind == None:
+            fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 1, 12, 15, 0, 0, 0, 0)) \
                                 & (clim_dates.data < DatetimeGregorian(final_year + 1, 1, 15, 0, 0, 0, 0))
-        
+        else:
+            fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 1, 12, 15, 0, 0, 0, 0)) \
+                                & (clim_dates.data < DatetimeGregorian(final_year, pred_mon_ind + 1, 15, 0, 0, 0, 0))
+            
     return fire_tim_ind
 
 def human_var_interp(var_name, sav_flag= False):
@@ -451,25 +455,34 @@ def human_var_interp(var_name, sav_flag= False):
     else:
         return popdf_tot
 
-def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L3', l4indx= None, tscale= "yearly", savg= True, start_year= 1984, final_year= 2019, burnarr_len= 0):
+def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L3', l4indx= None, tscale= "yearly", savg= True, start_year= 1984, final_year= 2019, \
+                      burnarr_len= 0, seas_pred_flag= False, pred_mon_ind= None):
     
-    # returns an array of climate predictor variable data indexed by season
+    # returns an array of climate predictor variable data at different temporal scales; (04/24/23) included 'seas_pred_flag' to create separate array for seasonal climate prediction
     
     regname= {1: "ca_sierra", 2: "ca_north_coast", 3: "ca_cent_coast", 4: "ca_south_coast", 5: "pnw_mts", 6: "columbia_plateau", 7:"northern_rockies", \
           8: "middle_rockies", 9: "southern_rockies", 10: "am_semidesert", 11: "aznm_mts", 12: "im_semidesert", 13: "im_desert", 14: "northern_great_plains", \
           15: "high_plains", 16: "colorado_plateau", 17: "sw_tablelands", 18: "ch_desert", 19: "ca_total"}
-    pred_flabel_arr= {1: ["climate/primary/tmax.nc"], 2: ["climate/primary/es.nc", "climate/primary/ea.nc"], 3: ["climate/primary/prec.nc"], \
-                     4: ["climate/primary/prec.nc"], 5: ["climate/primary/ETo_co2.nc"], 6: ["landcover/nlcd/forest.nc"], 7: ["climate/primary/solar.nc"], \
-                     8: ["climate/ucla_era5_wrf/windmax_max1.nc"], 9: ["topography/elev.nc"], 10: ["landcover/nlcd/grassland.nc"], \
-                     11: ["landcover/fuel_winslow/study_regions/deadbiomass_litter.nc"], 12: ["landcover/fuel_winslow/study_regions/livebiomass_leaf.nc"], \
-                     13: ["landcover/fuel_winslow/study_regions/connectivity.nc"], 14: ["climate/primary/rh.nc"], 15: ["climate/gridmet/fm1000.nc"], \
-                     16: ["climate/era5/cape.nc"], 17: ["landcover/nlcd/urban.nc"], 18: ["climate/ucla_era5_wrf/ffwi_max3.nc"], 19: ["climate/primary/tmin.nc"], \
-                     20: ["climate/ucla_era5_wrf/windmax_max3.nc"], 21: ["population/campdist.nc"], 22: ["population/campnum.nc"], 23: ["population/roaddist.nc"], \
-                     24: ["climate/ucla_era5_wrf/vpd_max3.nc"], 25: ["climate/ucla_era5_wrf/vpd_max7.nc"], 26: ["climate/ucla_era5_wrf/tmax_max3.nc"], \
-                     27: ["climate/ucla_era5_wrf/tmax_max7.nc"], 28: ["climate/ucla_era5_wrf/tmin_max3.nc"], 29: ["climate/ucla_era5_wrf/tmin_max7.nc"], \
-                     30: ["climate/ucla_era5_wrf/ffwi_max7.nc"], 31: ["topography/slope.nc"], 32: ["topography/southness.nc"], 33: ["nsidc/swemean.nc"], 34: ["nsidc/swemax.nc"], \
-                     35: ["climate/primary/tmax.nc", "climate/primary/tmin.nc"], 36: ["landcover/biomass_aboveground.nc"], 37: ["population/silvis/PopDenOf10perkm_distance_interp.nc"], \
-                     38: ["population/silvis/house_density_interp.nc"], 39: ["lightning/strike_density_interp.nc"], 40: ["climate/ucla_era5_wrf/rh_min3.nc"], 41: ["landcover/nlcd/shrub.nc"]}
+    if not seas_pred_flag:
+        pred_flabel_arr= {1: ["climate/primary/tmax.nc"], 2: ["climate/primary/es.nc", "climate/primary/ea.nc"], 3: ["climate/primary/prec.nc"], \
+                         4: ["climate/primary/prec.nc"], 5: ["climate/primary/ETo_co2.nc"], 6: ["landcover/nlcd/forest.nc"], 7: ["climate/primary/solar.nc"], \
+                         8: ["climate/ucla_era5_wrf/windmax_max1.nc"], 9: ["topography/elev.nc"], 10: ["landcover/nlcd/grassland.nc"], \
+                         11: ["landcover/fuel_winslow/study_regions/deadbiomass_litter.nc"], 12: ["landcover/fuel_winslow/study_regions/livebiomass_leaf.nc"], \
+                         13: ["landcover/fuel_winslow/study_regions/connectivity.nc"], 14: ["climate/primary/rh.nc"], 15: ["climate/gridmet/fm1000.nc"], \
+                         16: ["climate/era5/cape.nc"], 17: ["landcover/nlcd/urban.nc"], 18: ["climate/ucla_era5_wrf/ffwi_max3.nc"], 19: ["climate/primary/tmin.nc"], \
+                         20: ["climate/ucla_era5_wrf/windmax_max3.nc"], 21: ["population/campdist.nc"], 22: ["population/campnum.nc"], 23: ["population/roaddist.nc"], \
+                         24: ["climate/ucla_era5_wrf/vpd_max3.nc"], 25: ["climate/ucla_era5_wrf/vpd_max7.nc"], 26: ["climate/ucla_era5_wrf/tmax_max3.nc"], \
+                         27: ["climate/ucla_era5_wrf/tmax_max7.nc"], 28: ["climate/ucla_era5_wrf/tmin_max3.nc"], 29: ["climate/ucla_era5_wrf/tmin_max7.nc"], \
+                         30: ["climate/ucla_era5_wrf/ffwi_max7.nc"], 31: ["topography/slope.nc"], 32: ["topography/southness.nc"], 33: ["nsidc/swemean.nc"], 34: ["nsidc/swemax.nc"], \
+                         35: ["climate/primary/tmax.nc", "climate/primary/tmin.nc"], 36: ["landcover/biomass_aboveground.nc"], 37: ["population/silvis/PopDenOf10perkm_distance_interp.nc"], \
+                         38: ["population/silvis/house_density_interp.nc"], 39: ["lightning/strike_density_interp.nc"], 40: ["climate/ucla_era5_wrf/rh_min3.nc"], 41: ["landcover/nlcd/shrub.nc"]}
+    else:
+        pred_flabel_arr= {1: ["climate/primary/tmax.nc"], 2: ["climate/primary/vpd.nc"], 3: ["climate/primary/prec.nc"], 4: ["climate/primary/solar.nc"], 5: ["climate/primary/wind.nc"], \
+                         6: ["climate/primary/rh.nc"], 7: ["climate/primary/cape.nc"], 8: ["climate/primary/ffwi.nc"], 9: ["climate/primary/tmin.nc"], 10: ["climate/primary/swemean.nc"], \
+                         11: ["climate/primary/soilm_0_100cm.nc"], 12: ["climate/primary/scPDSI.nc"], 13: ["climate/from_daily/wind_max1.nc"], 14: ["climate/from_daily/wind_max3.nc"], \
+                         15: ["climate/from_daily/tmax_max3.nc"], 16: ["climate/from_daily/tmax_max7.nc"], 17: ["climate/from_daily/tmin_max3.nc"], 18: ["climate/from_daily/tmin_max7.nc"], \
+                         19: ["climate/from_daily/ffwi_max3.nc"], 20: ["climate/from_daily/ffwi_max7.nc"], 21: ["climate/from_daily/vpd_max3.nc"], 22: ["climate/from_daily/vpd_max7.nc"], \
+                         23: ["topography/southness.nc"], 24: ["topography/elev.nc"], 25: ["landcover/biomass_aboveground.nc"]}
     pred_season_arr= {1: "warm", 2: "antecedent_lag1", 3: "annual", 4: "static", 5: "moving_average_3mo", 6: "moving_average_4mo", 7: "moving_average_2mo", \
                       8: "antecedent_lag2", 9: "antecedent_avg"} 
                       #be careful about indexing since this is correlated with input for multivariate regression 
@@ -487,8 +500,11 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
             pred_data= xarray.open_dataarray(pred_file)
         else:
             pred_data= bailey_ecoprovince_mask(pred_file, region= regname[regindx], lflag= lflag, l4indx= l4indx);
-     
-    tot_months= (final_year + 1 - start_year)*12
+    
+    if final_year != 2023:
+        tot_months= (final_year + 1 - start_year)*12
+    else:
+        tot_months= (final_year - start_year)*12 + pred_mon_ind
     
     if tscale == "yearly":
         pred_season= pred_season_arr[pred_seas_indx] 
@@ -512,7 +528,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
     elif tscale == "monthly":
         pred_season= pred_season_arr[pred_seas_indx]
         if pred_season == "warm": #replace warm with fire month 
-            fire_tim_ind= fire_tim_ind_func(pred_file, start_year, final_year)
+            fire_tim_ind= fire_tim_ind_func(pred_file, start_year, final_year, pred_mon_ind= pred_mon_ind)
             if savg: #savg = True ==> spatial average for fire frequency 
                 return np.mean(pred_data[fire_tim_ind], axis= (1, 2)).values
             else:
@@ -1009,40 +1025,57 @@ def init_eff_clim_fire_df(firegdf, start_month= 372, tot_test_months= 60, hyp_fl
     
     return newdf
 
-def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None):
+def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None, seas_pred_flag= False, pred_mon_ind= None):
     
     # Initializes a dataframe with climate and fire frequency information at each grid point; startmon/totmonths is for test data!
+    # seas_pred_flag = True if the climate predictors are for subseasonal prediction; 
+    # pred_mon_ind is the index of the month for which the subseasonal prediction has been initiated;
     
-    pred_flabel_arr= {1: ['Tmax', 'warm'], 2: ['VPD', 'warm'], 3: ['Prec', 'warm'], 4: ['Prec', 'antecedent_lag1', 'Antprec_lag1'], 5: ['Forest', 'annual'], \
-                        6: ['Solar', 'warm'], 7: ['Wind', 'warm'], 8: ['Elev', 'static'], 9: ['Grassland', 'annual'], 10: ['RH', 'warm'], 11: ['FM1000', 'warm'], \
-                        12: ['Tmax', 'moving_average_3mo', 'Ant_Tmax'], 13: ['VPD', 'moving_average_3mo', 'AvgVPD_3mo'], \
-                        14: ['Prec', 'moving_average_3mo', 'Avgprec_3mo'], 15: ['RH', 'moving_average_3mo', 'Ant_RH'], 16: ['CAPE', 'warm'], 17: ['Urban', 'annual'],\
-                        18: ['FFWI_max3', 'warm'], 19:['FFWI_max7', 'warm'], 20: ['Tmin', 'warm'], 21: ['Camp_dist', 'static'], 22: ['Camp_num', 'static'], \
-                        23: ['Road_dist', 'static'], 24: ['Prec', 'antecedent_lag2', 'Antprec_lag2'], 25: ['Prec', 'moving_average_4mo', 'Avgprec_4mo'], \
-                        26: ['Prec', 'moving_average_2mo', 'Avgprec_2mo'], 27: ['VPD_max3', 'warm'], 28: ['VPD_max7', 'warm'], 29: ['Tmax_max3', 'warm'], \
-                        30: ['Tmax_max7', 'warm'], 31: ['Tmin_max3', 'warm'], 32: ['Tmin_max7', 'warm'], 33: ['Slope', 'static'], 34:['Southness', 'static'], \
-                        35: ['VPD', 'moving_average_4mo', 'AvgVPD_4mo'], 36: ['VPD', 'moving_average_2mo', 'AvgVPD_2mo'], 37: ['SWE_mean', 'warm'], 38: ['SWE_max', 'warm'], \
-                        39: ['SWE_mean', 'moving_average_3mo', 'AvgSWE_3mo'], 40: ['Delta_T', 'warm'], 41: ['Biomass', 'static'], 42: ['Popdensity', 'annual'], \
-                        43: ['Housedensity', 'annual'], 44: ['Lightning', 'warm'], 45: ['RH_min3', 'warm'], 46: ['Shrub', 'annual']}
-    pred_findx_arr= {'Tmax': 1, 'VPD': 2, 'Prec': 3, 'Forest': 6, 'Solar': 7, 'Wind': 20, 'Elev': 9, 'Grassland': 10, 'RH': 14, 'FM1000': 15, 'CAPE': 16, 'Urban': 17, 'FFWI_max3': 18, \
-                     'FFWI_max7': 30, 'Tmin': 19, 'Camp_dist': 21, 'Camp_num': 22, 'Road_dist': 23, 'VPD_max3': 24, 'VPD_max7': 25, 'Tmax_max3': 26, 'Tmax_max7': 27, 'Tmin_max3': 28, \
-                     'Tmin_max7': 29, 'Slope': 31, 'Southness': 32, 'SWE_mean': 33, 'SWE_max': 34, 'Delta_T': 35, 'Biomass': 36, 'Popdensity': 37, 'Housedensity': 38, 'Lightning': 39, \
-                     'RH_min3': 40, 'Shrub': 41}
+    if not seas_pred_flag:
+        pred_flabel_arr= {1: ['Tmax', 'warm'], 2: ['VPD', 'warm'], 3: ['Prec', 'warm'], 4: ['Prec', 'antecedent_lag1', 'Antprec_lag1'], 5: ['Forest', 'annual'], \
+                            6: ['Solar', 'warm'], 7: ['Wind', 'warm'], 8: ['Elev', 'static'], 9: ['Grassland', 'annual'], 10: ['RH', 'warm'], 11: ['FM1000', 'warm'], \
+                            12: ['Tmax', 'moving_average_3mo', 'Ant_Tmax'], 13: ['VPD', 'moving_average_3mo', 'AvgVPD_3mo'], \
+                            14: ['Prec', 'moving_average_3mo', 'Avgprec_3mo'], 15: ['RH', 'moving_average_3mo', 'Ant_RH'], 16: ['CAPE', 'warm'], 17: ['Urban', 'annual'],\
+                            18: ['FFWI_max3', 'warm'], 19:['FFWI_max7', 'warm'], 20: ['Tmin', 'warm'], 21: ['Camp_dist', 'static'], 22: ['Camp_num', 'static'], \
+                            23: ['Road_dist', 'static'], 24: ['Prec', 'antecedent_lag2', 'Antprec_lag2'], 25: ['Prec', 'moving_average_4mo', 'Avgprec_4mo'], \
+                            26: ['Prec', 'moving_average_2mo', 'Avgprec_2mo'], 27: ['VPD_max3', 'warm'], 28: ['VPD_max7', 'warm'], 29: ['Tmax_max3', 'warm'], \
+                            30: ['Tmax_max7', 'warm'], 31: ['Tmin_max3', 'warm'], 32: ['Tmin_max7', 'warm'], 33: ['Slope', 'static'], 34:['Southness', 'static'], \
+                            35: ['VPD', 'moving_average_4mo', 'AvgVPD_4mo'], 36: ['VPD', 'moving_average_2mo', 'AvgVPD_2mo'], 37: ['SWE_mean', 'warm'], 38: ['SWE_max', 'warm'], \
+                            39: ['SWE_mean', 'moving_average_3mo', 'AvgSWE_3mo'], 40: ['Delta_T', 'warm'], 41: ['Biomass', 'static'], 42: ['Popdensity', 'annual'], \
+                            43: ['Housedensity', 'annual'], 44: ['Lightning', 'warm'], 45: ['RH_min3', 'warm'], 46: ['Shrub', 'annual']}
+        pred_findx_arr= {'Tmax': 1, 'VPD': 2, 'Prec': 3, 'Forest': 6, 'Solar': 7, 'Wind': 20, 'Elev': 9, 'Grassland': 10, 'RH': 14, 'FM1000': 15, 'CAPE': 16, 'Urban': 17, 'FFWI_max3': 18, \
+                         'FFWI_max7': 30, 'Tmin': 19, 'Camp_dist': 21, 'Camp_num': 22, 'Road_dist': 23, 'VPD_max3': 24, 'VPD_max7': 25, 'Tmax_max3': 26, 'Tmax_max7': 27, 'Tmin_max3': 28, \
+                         'Tmin_max7': 29, 'Slope': 31, 'Southness': 32, 'SWE_mean': 33, 'SWE_max': 34, 'Delta_T': 35, 'Biomass': 36, 'Popdensity': 37, 'Housedensity': 38, 'Lightning': 39, \
+                         'RH_min3': 40, 'Shrub': 41}
+    else:
+        pred_flabel_arr= {1: ['Tmax', 'warm'], 2: ['VPD', 'warm'], 3: ['Prec', 'warm'], 4: ['Solar', 'warm'], 5: ['Wind', 'warm'], 6: ['RH', 'warm'], 7: ['CAPE', 'warm'], 8: ['FFWI', 'warm'], \
+                            9: ['Tmin', 'warm'], 10: ['SWE_mean', 'warm'], 11: ['SM_0_100cm', 'warm'], 12: ['PDSI', 'warm'], 13: ['Wind_max1', 'warm'], 14: ['Wind_max3', 'warm'], \
+                            15: ['Tmax_max3', 'warm'], 16: ['Tmax_max7', 'warm'], 17: ['Tmin_max3', 'warm'], 18: ['Tmin_max7', 'warm'], 19: ['FFWI_max3', 'warm'], 20: ['FFWI_max7', 'warm'], \
+                            21: ['VPD_max3', 'warm'] , 22: ['VPD_max7', 'warm'], 23: ['Southness', 'static'], 24:['Elev', 'static'], 25: ['Biomass', 'static']}
     pred_sindx_arr= {"warm": 1, "antecedent_lag1": 2, "annual": 3, "static": 4, "moving_average_3mo": 5, "moving_average_4mo": 6, "moving_average_2mo": 7, "antecedent_lag2": 8, "antecedent_avg": 9} 
     
     clim_fire_df= pd.DataFrame([])
-    tot_months= (final_year + 1 - start_year)*12
+    if final_year != 2023:
+        tot_months= (final_year + 1 - start_year)*12
+    else:
+        tot_months= (final_year - start_year)*12 + pred_mon_ind
     
     for i in tqdm(range(len(pred_flabel_arr))): 
         pred_var= pred_flabel_arr[i+1][0]
         seas_var= pred_flabel_arr[i+1][1]
-        if pred_sindx_arr[seas_var] in [2, 5, 6, 7, 8, 9]: #variables whose antecedent characteristics are important
-            gdf_var= pred_flabel_arr[i+1][2]
+        if seas_pred_flag == None:
+            if pred_sindx_arr[seas_var] in [2, 5, 6, 7, 8, 9]: #variables whose antecedent characteristics are important
+                gdf_var= pred_flabel_arr[i+1][2]
+            else:
+                gdf_var= pred_var
+
+            clim_var_data= clim_pred_var(pred_file_indx= pred_findx_arr[pred_var], pred_seas_indx= pred_sindx_arr[seas_var], tscale= "monthly", savg= False, \
+                                                                                                                start_year= start_year, final_year= final_year)
         else:
             gdf_var= pred_var
 
-        clim_var_data= clim_pred_var(pred_file_indx= pred_findx_arr[pred_var], pred_seas_indx= pred_sindx_arr[seas_var], tscale= "monthly", savg= False, \
-                                                                                                            start_year= start_year, final_year= final_year)
+            clim_var_data= clim_pred_var(pred_file_indx= i+1, pred_seas_indx= pred_sindx_arr[seas_var], tscale= "monthly", savg= False, \
+                                                                                                                start_year= start_year, final_year= final_year, seas_pred_flag= True, pred_mon_ind= pred_mon_ind)
         if res == '24km':
             if seas_var == 'static':
                 clim_var_arr= np.nanmean(sliding_window_view(clim_var_data[:-1 , :], (2, 2), axis= (0, 1)), axis= (2, 3))[::2, ::2]
@@ -1108,6 +1141,10 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
         var_df= var_arr.to_dataframe(name= gdf_var).reset_index() #.dropna()
         clim_fire_df= pd.concat([clim_fire_df, var_df[gdf_var]], axis= 1)
         
+    if seas_pred_flag:
+        coord_df= var_df[['X', 'Y', 'time']]
+        clim_fire_df= pd.concat([clim_fire_df, coord_df['time'], coord_df['X'], coord_df['Y']], axis=1)
+    
     return clim_fire_df
 
 def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, threshold= None, seas_arr= None):
