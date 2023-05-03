@@ -103,13 +103,7 @@ def coord_transform(coord_a, coord_b, input_crs= 'WGS84', output_crs= 'EPSG:5070
     #function to convert coordinates between different reference systems with a little help from pyproj.Transformer
     #custom crs i/o with https://gis.stackexchange.com/questions/427786/pyproj-and-a-custom-crs
     
-    crs_4326 = CRS("WGS84")
-    crs_proj = CRS(output_crs)
-    
-    if input_crs != 'WGS84':
-        transformer= Transformer.from_crs(crs_proj, crs_4326) #ESRI:54008
-    else:
-        transformer= Transformer.from_crs(crs_4326, crs_proj)
+    transformer= Transformer.from_crs(input_crs, output_crs)
         
     # we add another if-else loop to account for differences in input size: for different sizes, we first construct a meshgrid,
     # before transforming coordinates. Thus, the output types will differ depending on the input.
@@ -240,6 +234,78 @@ def bailey_ecoprovince_mask(filepath, region, lflag= 'L3', l4indx= None):
         clipped= file.rio.clip(regshp[regshp['US_L4CODE'] == l4indx].geometry.apply(mapping), regshp.crs, drop=False)
     return clipped
 
+def init_fire_modis_gdf(burnarea_modis, start_year= 2021):
+
+    # Function to initialize a 12km geopandas dataframe from griddded MODIS burn area data at 1km resolution while ensuring no duplicate fires
+
+    # Rebin the 1km burn area data in burnarea_modis to 12km resolution
+    burnarea_modis_12km = burnarea_modis.coarsen(dim={'X':12, 'Y':12}, boundary='pad').sum()  # coarsen the data
+
+    # Find centroid of each pixel in burnarea_modis_12km
+    burnarea_modis_12km['X'] = burnarea_modis_12km.X - 6
+    burnarea_modis_12km['Y'] = burnarea_modis_12km.Y - 6
+
+    # Collect all the non-zero values in burnarea_modis_12km
+    burnarea_modis_12km_nonzero = burnarea_modis_12km.where(burnarea_modis_12km>0, drop=True)
+    burnarea_modis_12km_nonzero_df= burnarea_modis_12km_nonzero.to_dataframe(dim_order= ['time', 'Y', 'X']).reset_index().dropna()
+
+    # Find neighboring 12km pixels in burnarea_modis_12km_nonzero_df
+    def find_neighboring_pixels(x, y, cellwidth= 12000): 
+        # Note: cellwidth is in meters
+        neighboring_pixels= []
+        neighboring_pixels.append(Polygon([(x-2*cellwidth, y), (x, y+2*cellwidth), (x+2*cellwidth, y), (x, y-2*cellwidth)])) # 4 neighboring pixels
+        return neighboring_pixels[0]
+
+    burnarea_modis_12km_nonzero_df['neighboring_pixels']= burnarea_modis_12km_nonzero_df.apply(lambda x: find_neighboring_pixels(x['X'], x['Y']), axis=1)
+
+    # Converting into geopandas data frame with origin as the geometry; only selecting fires in 2021 and 2022
+    gdf= gpd.GeoDataFrame(burnarea_modis_12km_nonzero_df, geometry=gpd.points_from_xy(burnarea_modis_12km_nonzero_df["X"], burnarea_modis_12km_nonzero_df["Y"]), crs= 'EPSG:5070')
+    gdf= gdf[gdf.time.dt.year >= start_year].reset_index().drop(columns= ['index'])
+
+    # Identifying duplicates
+    index_arr= gdf.index.to_numpy()
+    for i in tqdm(gdf.index - 1):
+        if i>= len(gdf.index) - 10:
+            for j in range(len(gdf.index)- i - 1):
+                if (gdf.iloc[i].neighboring_pixels.contains(gdf.iloc[i+j+1].geometry)) & (gdf.iloc[i].time== gdf.iloc[i+j+1].time):
+                    index_arr[i+j+1]= index_arr[i]
+        else:
+            for j in range(10):
+                if (gdf.iloc[i].neighboring_pixels.contains(gdf.iloc[i+j+1].geometry)) & (gdf.iloc[i].time== gdf.iloc[i+j+1].time):
+                    index_arr[i+j+1]= index_arr[i]
+
+    gdf['fire_indx'] = index_arr
+
+    # Calculating the area of each unique fire in hectares
+    fireindxgroups= gdf.groupby('fire_indx')
+    final_area_ha_arr= np.zeros(len(gdf))
+    flag= 0
+    for f in tqdm(fireindxgroups.groups.keys()):
+        final_area_ha_arr[flag:flag+len(fireindxgroups.get_group(f))]= fireindxgroups.get_group(f).burnarea.sum()*1e2
+        flag= flag+len(fireindxgroups.get_group(f))
+
+    gdf['final_area_ha']= final_area_ha_arr
+
+    # Standardizing columns to match wildfire_gdf
+    gdf['final_year']= gdf.time.dt.year
+    gdf['final_month']= gdf.time.dt.month
+    gdf['final_day']= gdf.time.dt.day
+    gdf['final_forest_area_ha']= np.zeros(len(gdf.index), dtype= float)
+    gdf['intagncy_agency']= np.ones(len(gdf.index), dtype= float)*np.nan
+    gdf['intagncy_name']= np.ones(len(gdf.index), dtype= float)*np.nan
+    gdf['MTBS_name']= np.ones(len(gdf.index), dtype= float)*np.nan
+
+    gdf_lat, gdf_lon= coord_transform(gdf['X'], gdf['Y'], input_crs= 'EPSG:5070', output_crs= 'EPSG:4326')
+
+    gdf['final_lat']= gdf_lat
+    gdf['final_lon']= gdf_lon
+    gdf['final_x']= gdf['X']
+    gdf['final_y']= gdf['Y']
+
+    gdf= gdf.drop_duplicates(subset= ['fire_indx'], ignore_index= True).drop(columns= ['time', 'X', 'Y', 'burnarea', 'fire_indx', 'neighboring_pixels'])
+
+    return gdf
+
 def reg_indx_func(region, firegdf, lflag = 'L3'):
     
     #inspiration: https://stackoverflow.com/questions/36399381/whats-the-fastest-way-of-checking-if-a-point-is-inside-a-polygon-in-python
@@ -275,12 +341,13 @@ def update_reg_indx(firegdf, lflag = 'L3'):
         return tmp_reg_indx_arr
     
     elif lflag == 'L4':
-        tmp_reg_indx_arr= np.empty(len(firegdf), dtype= 'U8')
+        tmp_reg_indx_arr= np.empty(len(firegdf), dtype= 'U8') 
         for i in np.linspace(1, len(regname), len(regname), dtype= int):
             tmplocarr, tmpl4indxarr= reg_indx_func(regname[i], firegdf, lflag)
             ind_arr= np.argsort(tmplocarr)
             np.add.at(tmp_reg_indx_arr, np.sort(tmplocarr), tmpl4indxarr[ind_arr])
 
+        tmp_reg_indx_arr[tmp_reg_indx_arr == '']= '00' #set missing entries to '00'
         return tmp_reg_indx_arr
 
 
@@ -882,7 +949,7 @@ def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_y
 
     print("Constructed a raster grid with %s grid cell size"%res);
     
-    firepts= gpd.GeoSeries(firegdf['geometry'].buffer(np.sqrt(firegdf['final_area_ha']*1e4/np.pi))) #currently buffer is a circle with radius = sqrt(A/pi) [in m]
+    firepts= gpd.GeoSeries(firegdf['geometry'].buffer(np.sqrt(firegdf['final_area_ha']*1e4/np.pi))) #currently buffer is a circle with radius = sqrt(A/pi) [in m] with origin as the provided fire location
     firepts_gdf= gpd.GeoDataFrame({'geometry': firepts, 'fire_indx': firegdf.index.to_numpy(), \
                                'fire_month': (firegdf['final_month'] - 1) + (firegdf['final_year'] - 1984)*12, \
                                'fire_size': firegdf['final_area_ha']*1e4, 'reg_indx': firegdf['reg_indx'], \
@@ -1144,6 +1211,7 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
     if seas_pred_flag:
         coord_df= var_df[['X', 'Y', 'time']]
         clim_fire_df= pd.concat([clim_fire_df, coord_df['time'], coord_df['X'], coord_df['Y']], axis=1)
+        clim_fire_df.rename(columns= {'time': 'month'}, inplace= True) # rename 'time' column in clim_fire_df to 'month'
     
     return clim_fire_df
 
