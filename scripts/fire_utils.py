@@ -242,8 +242,8 @@ def init_fire_modis_gdf(burnarea_modis, start_year= 2021):
     burnarea_modis_12km = burnarea_modis.coarsen(dim={'X':12, 'Y':12}, boundary='pad').sum()  # coarsen the data
 
     # Find centroid of each pixel in burnarea_modis_12km
-    burnarea_modis_12km['X'] = burnarea_modis_12km.X - 6
-    burnarea_modis_12km['Y'] = burnarea_modis_12km.Y - 6
+    burnarea_modis_12km['X'] = burnarea_modis_12km.X - 6000
+    burnarea_modis_12km['Y'] = burnarea_modis_12km.Y - 6000
 
     # Collect all the non-zero values in burnarea_modis_12km
     burnarea_modis_12km_nonzero = burnarea_modis_12km.where(burnarea_modis_12km>0, drop=True)
@@ -284,7 +284,9 @@ def init_fire_modis_gdf(burnarea_modis, start_year= 2021):
         final_area_ha_arr[flag:flag+len(fireindxgroups.get_group(f))]= fireindxgroups.get_group(f).burnarea.sum()*1e2
         flag= flag+len(fireindxgroups.get_group(f))
 
+    gdf.sort_values(by= ['fire_indx'], inplace= True)
     gdf['final_area_ha']= final_area_ha_arr
+    gdf.reset_index().drop(columns= ['index'])
 
     # Standardizing columns to match wildfire_gdf
     gdf['final_year']= gdf.time.dt.year
@@ -533,16 +535,14 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
     if not seas_pred_flag:
         pred_flabel_arr= {1: ["climate/primary/tmax.nc"], 2: ["climate/primary/es.nc", "climate/primary/ea.nc"], 3: ["climate/primary/prec.nc"], \
                          4: ["climate/primary/prec.nc"], 5: ["climate/primary/ETo_co2.nc"], 6: ["landcover/nlcd/forest.nc"], 7: ["climate/primary/solar.nc"], \
-                         8: ["climate/ucla_era5_wrf/windmax_max1.nc"], 9: ["topography/elev.nc"], 10: ["landcover/nlcd/grassland.nc"], \
-                         11: ["landcover/fuel_winslow/study_regions/deadbiomass_litter.nc"], 12: ["landcover/fuel_winslow/study_regions/livebiomass_leaf.nc"], \
-                         13: ["landcover/fuel_winslow/study_regions/connectivity.nc"], 14: ["climate/primary/rh.nc"], 15: ["climate/gridmet/fm1000.nc"], \
-                         16: ["climate/era5/cape.nc"], 17: ["landcover/nlcd/urban.nc"], 18: ["climate/ucla_era5_wrf/ffwi_max3.nc"], 19: ["climate/primary/tmin.nc"], \
-                         20: ["climate/ucla_era5_wrf/windmax_max3.nc"], 21: ["population/campdist.nc"], 22: ["population/campnum.nc"], 23: ["population/roaddist.nc"], \
-                         24: ["climate/ucla_era5_wrf/vpd_max3.nc"], 25: ["climate/ucla_era5_wrf/vpd_max7.nc"], 26: ["climate/ucla_era5_wrf/tmax_max3.nc"], \
-                         27: ["climate/ucla_era5_wrf/tmax_max7.nc"], 28: ["climate/ucla_era5_wrf/tmin_max3.nc"], 29: ["climate/ucla_era5_wrf/tmin_max7.nc"], \
-                         30: ["climate/ucla_era5_wrf/ffwi_max7.nc"], 31: ["topography/slope.nc"], 32: ["topography/southness.nc"], 33: ["nsidc/swemean.nc"], 34: ["nsidc/swemax.nc"], \
-                         35: ["climate/primary/tmax.nc", "climate/primary/tmin.nc"], 36: ["landcover/biomass_aboveground.nc"], 37: ["population/silvis/PopDenOf10perkm_distance_interp.nc"], \
-                         38: ["population/silvis/house_density_interp.nc"], 39: ["lightning/strike_density_interp.nc"], 40: ["climate/ucla_era5_wrf/rh_min3.nc"], 41: ["landcover/nlcd/shrub.nc"]}
+                         8: ["climate/from_daily/wind_max1.nc"], 9: ["topography/elev.nc"], 10: ["landcover/nlcd/grassland.nc"], 11: ["climate/primary/rh.nc"], 12: ["climate/primary/scPDSI.nc"], \
+                         13: ["climate/primary/cape.nc"], 14: ["landcover/nlcd/urban.nc"], 15: ["climate/from_daily/ffwi_max3.nc"], 16: ["climate/primary/tmin.nc"], \
+                         17: ["climate/from_daily/wind_max3.nc"], 18: ["population/campdist.nc"], 19: ["population/campnum.nc"], 20: ["population/roaddist.nc"], \
+                         21: ["climate/from_daily/vpd_max3.nc"], 22: ["climate/from_daily/vpd_max7.nc"], 23: ["climate/from_daily/tmax_max3.nc"], \
+                         24: ["climate/from_daily/tmax_max7.nc"], 25: ["climate/from_daily/tmin_max3.nc"], 26: ["climate/from_daily/tmin_max7.nc"], \
+                         27: ["climate/from_daily/ffwi_max7.nc"], 28: ["topography/slope.nc"], 29: ["topography/southness.nc"], 30: ["nsidc/swemean.nc"], 31: ["nsidc/swemax.nc"], \
+                         32: ["climate/primary/tmax.nc", "climate/primary/tmin.nc"], 33: ["landcover/biomass_aboveground.nc"], 34: ["climate/from_daily/rh_min3.nc"], 35: ["landcover/nlcd/shrub.nc"]} 
+                         #11: ["landcover/fuel_winslow/study_regions/deadbiomass_litter.nc"], 12: ["landcover/fuel_winslow/study_regions/livebiomass_leaf.nc"], 13: ["landcover/fuel_winslow/study_regions/connectivity.nc"]37: ["population/silvis/PopDenOf10perkm_distance_interp.nc"], 38: ["population/silvis/house_density_interp.nc"], 39: ["lightning/strike_density_interp.nc"]
     else:
         pred_flabel_arr= {1: ["climate/primary/tmax.nc"], 2: ["climate/primary/vpd.nc"], 3: ["climate/primary/prec.nc"], 4: ["climate/primary/solar.nc"], 5: ["climate/primary/wind.nc"], \
                          6: ["climate/primary/rh.nc"], 7: ["climate/primary/cape.nc"], 8: ["climate/primary/ffwi.nc"], 9: ["climate/primary/tmin.nc"], 10: ["climate/primary/swemean.nc"], \
@@ -991,7 +991,7 @@ def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_y
 
     else:
         pred_flabel_arr= {1: ['Tmax', 'warm'], 2: ['VPD', 'warm'], 3: ['Prec', 'warm'], 4: ['Prec', 'antecedent_lag1', 'Antprec_lag1'], 5: ['Forest', 'annual'], \
-                        6: ['Solar', 'warm'], 7: ['Wind', 'warm'], 8: ['Elev', 'static'], 9: ['Grassland', 'annual'], 10: ['RH', 'warm'], 11: ['FM1000', 'warm'], \
+                        6: ['Solar', 'warm'], 7: ['Wind', 'warm'], 8: ['Elev', 'static'], 9: ['Grassland', 'annual'], 10: ['RH', 'warm'], 11: ['scPDSI', 'warm'], \
                         12: ['Tmax', 'moving_average_3mo', 'Ant_Tmax'], 13: ['VPD', 'moving_average_3mo', 'AvgVPD_3mo'], \
                         14: ['Prec', 'moving_average_3mo', 'Avgprec_3mo'], 15: ['RH', 'moving_average_3mo', 'Ant_RH'], 16: ['CAPE', 'warm'], 17: ['Urban', 'annual'],\
                         18: ['FFWI_max3', 'warm'], 19:['FFWI_max7', 'warm'], 20: ['Tmin', 'warm'], 21: ['Camp_dist', 'static'], 22: ['Camp_num', 'static'], \
@@ -999,13 +999,12 @@ def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_y
                         26: ['Prec', 'moving_average_2mo', 'Avgprec_2mo'], 27: ['VPD_max3', 'warm'], 28: ['VPD_max7', 'warm'], 29: ['Tmax_max3', 'warm'], \
                         30: ['Tmax_max7', 'warm'], 31: ['Tmin_max3', 'warm'], 32: ['Tmin_max7', 'warm'], 33: ['Slope', 'static'], 34:['Southness', 'static'], \
                         35: ['VPD', 'moving_average_4mo', 'AvgVPD_4mo'], 36: ['VPD', 'moving_average_2mo', 'AvgVPD_2mo'], 37: ['SWE_mean', 'warm'], 38: ['SWE_max', 'warm'], \
-                        39: ['SWE_mean', 'moving_average_3mo', 'AvgSWE_3mo'], 40: ['Delta_T', 'warm'], 41: ['Biomass', 'static'], 42: ['Popdensity', 'annual'], \
-                        43: ['Housedensity', 'annual'], 44: ['Lightning', 'warm'], 45: ['RH_min3', 'warm'], 46: ['Shrub', 'annual']}
+                        39: ['SWE_mean', 'moving_average_3mo', 'AvgSWE_3mo'], 40: ['Delta_T', 'warm'], 41: ['Biomass', 'static'], 42: ['RH_min3', 'warm'], 43: ['Shrub', 'annual']} #42: ['Popdensity', 'annual'], 43: ['Housedensity', 'annual'], 44: ['Lightning', 'warm']
         
-        pred_findx_arr= {'Tmax': 1, 'VPD': 2, 'Prec': 3, 'Forest': 6, 'Solar': 7, 'Wind': 20, 'Elev': 9, 'Grassland': 10, 'RH': 14, 'FM1000': 15, 'CAPE': 16, \
-                         'Urban': 17, 'FFWI_max3': 18, 'FFWI_max7': 30, 'Tmin': 19, 'Camp_dist': 21, 'Camp_num': 22, 'Road_dist': 23, \
-                         'VPD_max3': 24, 'VPD_max7': 25, 'Tmax_max3': 26, 'Tmax_max7': 27, 'Tmin_max3': 28, 'Tmin_max7': 29, 'Slope': 31, 'Southness': 32, \
-                         'SWE_mean': 33, 'SWE_max': 34, 'Delta_T': 35, 'Biomass': 36, 'Popdensity': 37, 'Housedensity': 38, 'Lightning': 39, 'RH_min3': 40, 'Shrub': 41}
+        pred_findx_arr= {'Tmax': 1, 'VPD': 2, 'Prec': 3, 'Forest': 6, 'Solar': 7, 'Wind': 17, 'Elev': 9, 'Grassland': 10, 'RH': 11, 'scPDSI': 12, 'CAPE': 13, \
+                         'Urban': 14, 'FFWI_max3': 15, 'FFWI_max7': 27, 'Tmin': 16, 'Camp_dist': 18, 'Camp_num': 19, 'Road_dist': 20, \
+                         'VPD_max3': 21, 'VPD_max7': 22, 'Tmax_max3': 23, 'Tmax_max7': 24, 'Tmin_max3': 25, 'Tmin_max7': 26, 'Slope': 28, 'Southness': 29, \
+                         'SWE_mean': 30, 'SWE_max': 31, 'Delta_T': 32, 'Biomass': 33, 'RH_min3': 34, 'Shrub': 35} #'Popdensity': 37, 'Housedensity': 38, 'Lightning': 39,
         pred_sindx_arr= {"warm": 1, "antecedent_lag1": 2, "annual": 3, "static": 4, "moving_average_3mo": 5, "moving_average_4mo": 6, "moving_average_2mo": 7, \
                          "antecedent_lag2": 8, "antecedent_avg": 9} 
         
@@ -1100,20 +1099,20 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
     
     if not seas_pred_flag:
         pred_flabel_arr= {1: ['Tmax', 'warm'], 2: ['VPD', 'warm'], 3: ['Prec', 'warm'], 4: ['Prec', 'antecedent_lag1', 'Antprec_lag1'], 5: ['Forest', 'annual'], \
-                            6: ['Solar', 'warm'], 7: ['Wind', 'warm'], 8: ['Elev', 'static'], 9: ['Grassland', 'annual'], 10: ['RH', 'warm'], 11: ['FM1000', 'warm'], \
-                            12: ['Tmax', 'moving_average_3mo', 'Ant_Tmax'], 13: ['VPD', 'moving_average_3mo', 'AvgVPD_3mo'], \
-                            14: ['Prec', 'moving_average_3mo', 'Avgprec_3mo'], 15: ['RH', 'moving_average_3mo', 'Ant_RH'], 16: ['CAPE', 'warm'], 17: ['Urban', 'annual'],\
-                            18: ['FFWI_max3', 'warm'], 19:['FFWI_max7', 'warm'], 20: ['Tmin', 'warm'], 21: ['Camp_dist', 'static'], 22: ['Camp_num', 'static'], \
-                            23: ['Road_dist', 'static'], 24: ['Prec', 'antecedent_lag2', 'Antprec_lag2'], 25: ['Prec', 'moving_average_4mo', 'Avgprec_4mo'], \
-                            26: ['Prec', 'moving_average_2mo', 'Avgprec_2mo'], 27: ['VPD_max3', 'warm'], 28: ['VPD_max7', 'warm'], 29: ['Tmax_max3', 'warm'], \
-                            30: ['Tmax_max7', 'warm'], 31: ['Tmin_max3', 'warm'], 32: ['Tmin_max7', 'warm'], 33: ['Slope', 'static'], 34:['Southness', 'static'], \
-                            35: ['VPD', 'moving_average_4mo', 'AvgVPD_4mo'], 36: ['VPD', 'moving_average_2mo', 'AvgVPD_2mo'], 37: ['SWE_mean', 'warm'], 38: ['SWE_max', 'warm'], \
-                            39: ['SWE_mean', 'moving_average_3mo', 'AvgSWE_3mo'], 40: ['Delta_T', 'warm'], 41: ['Biomass', 'static'], 42: ['Popdensity', 'annual'], \
-                            43: ['Housedensity', 'annual'], 44: ['Lightning', 'warm'], 45: ['RH_min3', 'warm'], 46: ['Shrub', 'annual']}
-        pred_findx_arr= {'Tmax': 1, 'VPD': 2, 'Prec': 3, 'Forest': 6, 'Solar': 7, 'Wind': 20, 'Elev': 9, 'Grassland': 10, 'RH': 14, 'FM1000': 15, 'CAPE': 16, 'Urban': 17, 'FFWI_max3': 18, \
-                         'FFWI_max7': 30, 'Tmin': 19, 'Camp_dist': 21, 'Camp_num': 22, 'Road_dist': 23, 'VPD_max3': 24, 'VPD_max7': 25, 'Tmax_max3': 26, 'Tmax_max7': 27, 'Tmin_max3': 28, \
-                         'Tmin_max7': 29, 'Slope': 31, 'Southness': 32, 'SWE_mean': 33, 'SWE_max': 34, 'Delta_T': 35, 'Biomass': 36, 'Popdensity': 37, 'Housedensity': 38, 'Lightning': 39, \
-                         'RH_min3': 40, 'Shrub': 41}
+                        6: ['Solar', 'warm'], 7: ['Wind', 'warm'], 8: ['Elev', 'static'], 9: ['Grassland', 'annual'], 10: ['RH', 'warm'], 11: ['scPDSI', 'warm'], \
+                        12: ['Tmax', 'moving_average_3mo', 'Ant_Tmax'], 13: ['VPD', 'moving_average_3mo', 'AvgVPD_3mo'], \
+                        14: ['Prec', 'moving_average_3mo', 'Avgprec_3mo'], 15: ['RH', 'moving_average_3mo', 'Ant_RH'], 16: ['CAPE', 'warm'], 17: ['Urban', 'annual'],\
+                        18: ['FFWI_max3', 'warm'], 19:['FFWI_max7', 'warm'], 20: ['Tmin', 'warm'], 21: ['Camp_dist', 'static'], 22: ['Camp_num', 'static'], \
+                        23: ['Road_dist', 'static'], 24: ['Prec', 'antecedent_lag2', 'Antprec_lag2'], 25: ['Prec', 'moving_average_4mo', 'Avgprec_4mo'], \
+                        26: ['Prec', 'moving_average_2mo', 'Avgprec_2mo'], 27: ['VPD_max3', 'warm'], 28: ['VPD_max7', 'warm'], 29: ['Tmax_max3', 'warm'], \
+                        30: ['Tmax_max7', 'warm'], 31: ['Tmin_max3', 'warm'], 32: ['Tmin_max7', 'warm'], 33: ['Slope', 'static'], 34:['Southness', 'static'], \
+                        35: ['VPD', 'moving_average_4mo', 'AvgVPD_4mo'], 36: ['VPD', 'moving_average_2mo', 'AvgVPD_2mo'], 37: ['SWE_mean', 'warm'], 38: ['SWE_max', 'warm'], \
+                        39: ['SWE_mean', 'moving_average_3mo', 'AvgSWE_3mo'], 40: ['Delta_T', 'warm'], 41: ['Biomass', 'static'], 42: ['RH_min3', 'warm'], 43: ['Shrub', 'annual']} #42: ['Popdensity', 'annual'], 43: ['Housedensity', 'annual'], 44: ['Lightning', 'warm']
+        
+        pred_findx_arr= {'Tmax': 1, 'VPD': 2, 'Prec': 3, 'Forest': 6, 'Solar': 7, 'Wind': 17, 'Elev': 9, 'Grassland': 10, 'RH': 11, 'scPDSI': 12, 'CAPE': 13, \
+                         'Urban': 14, 'FFWI_max3': 15, 'FFWI_max7': 27, 'Tmin': 16, 'Camp_dist': 18, 'Camp_num': 19, 'Road_dist': 20, \
+                         'VPD_max3': 21, 'VPD_max7': 22, 'Tmax_max3': 23, 'Tmax_max7': 24, 'Tmin_max3': 25, 'Tmin_max7': 26, 'Slope': 28, 'Southness': 29, \
+                         'SWE_mean': 30, 'SWE_max': 31, 'Delta_T': 32, 'Biomass': 33, 'RH_min3': 34, 'Shrub': 35} #'Popdensity': 37, 'Housedensity': 38, 'Lightning': 39,
     else:
         pred_flabel_arr= {1: ['Tmax', 'warm'], 2: ['VPD', 'warm'], 3: ['Prec', 'warm'], 4: ['Solar', 'warm'], 5: ['Wind', 'warm'], 6: ['RH', 'warm'], 7: ['CAPE', 'warm'], 8: ['FFWI', 'warm'], \
                             9: ['Tmin', 'warm'], 10: ['SWE_mean', 'warm'], 11: ['SM_0_100cm', 'warm'], 12: ['PDSI', 'warm'], 13: ['Wind_max1', 'warm'], 14: ['Wind_max3', 'warm'], \
@@ -1130,7 +1129,7 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
     for i in tqdm(range(len(pred_flabel_arr))): 
         pred_var= pred_flabel_arr[i+1][0]
         seas_var= pred_flabel_arr[i+1][1]
-        if seas_pred_flag == None:
+        if not seas_pred_flag:
             if pred_sindx_arr[seas_var] in [2, 5, 6, 7, 8, 9]: #variables whose antecedent characteristics are important
                 gdf_var= pred_flabel_arr[i+1][2]
             else:
@@ -1223,7 +1222,7 @@ def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, fin
     tot_months= (final_year + 1 - start_year)*12
     
     if tscale == 'monthly':
-        clim_fire_grid_df= xarray.open_dataarray('../data/12km/climate/primary/tmax.nc').sel(time=slice('%s'%str(start_year), '%s'%str(final_year))).to_dataframe(name='Tmax').reset_index() #.dropna()
+        clim_fire_grid_df= xarray.open_dataarray(data_dir + pred_input_path + 'climate/primary/tmax.nc').sel(time=slice('%s'%str(start_year), '%s'%str(final_year))).to_dataframe(name='Tmax').reset_index() #.dropna()
         clim_fire_grid_gdf= gpd.GeoDataFrame(clim_fire_grid_df.Tmax, crs= 'EPSG:5070', geometry= gpd.points_from_xy(clim_fire_grid_df.X, clim_fire_grid_df.Y))
         reg_indx_arr= update_reg_indx(clim_fire_grid_gdf) #time: ~ 1.5 hrs
         clim_fire_grid_df['reg_indx']= reg_indx_arr
@@ -1238,10 +1237,10 @@ def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, fin
         
         coord_df= tmax_df[['X', 'Y', 'month']]
         coord_df['fire_freq']= np.zeros_like(len(coord_df), dtype= int)
-        if final_year != 2020:
+        if final_year < 2020:
             fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_data.h5').append(pd.read_hdf('../data/clim_fire_size_12km_test_data.h5'), ignore_index= True)
         else:
-            fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_w2020_data.h5').append(pd.read_hdf('../data/clim_fire_size_12km_test_w2020_data.h5'),\
+            fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_w%d_data.h5'%final_year).append(pd.read_hdf('../data/clim_fire_size_12km_test_w%d_data.h5'%final_year),\
                                                                                                                                                ignore_index= True)
         if threshold != None:
             fires_df= fires_df[fires_df['fire_size']/1e6 > 4].reset_index().drop(columns= ['index'])
