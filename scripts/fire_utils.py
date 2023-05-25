@@ -234,7 +234,14 @@ def bailey_ecoprovince_mask(filepath, region, lflag= 'L3', l4indx= None):
         clipped= file.rio.clip(regshp[regshp['US_L4CODE'] == l4indx].geometry.apply(mapping), regshp.crs, drop=False)
     return clipped
 
-def init_fire_modis_gdf(burnarea_modis, start_year= 2021):
+# Find neighboring 12km pixels in burnarea_modis_12km_nonzero_df
+def find_neighboring_pixels(x, y, cellwidth= 12000, nn= 2): 
+    # Note: cellwidth is in meters
+    neighboring_pixels= []
+    neighboring_pixels.append(Polygon([(x-nn*cellwidth, y), (x, y+nn*cellwidth), (x+nn*cellwidth, y), (x, y-nn*cellwidth)])) # nn neighboring pixels
+    return neighboring_pixels[0]
+
+def init_fire_modis_gdf(burnarea_modis, start_year= 2021, nn= 2):
 
     # Function to initialize a 12km geopandas dataframe from griddded MODIS burn area data at 1km resolution while ensuring no duplicate fires
 
@@ -249,14 +256,7 @@ def init_fire_modis_gdf(burnarea_modis, start_year= 2021):
     burnarea_modis_12km_nonzero = burnarea_modis_12km.where(burnarea_modis_12km>0, drop=True)
     burnarea_modis_12km_nonzero_df= burnarea_modis_12km_nonzero.to_dataframe(dim_order= ['time', 'Y', 'X']).reset_index().dropna()
 
-    # Find neighboring 12km pixels in burnarea_modis_12km_nonzero_df
-    def find_neighboring_pixels(x, y, cellwidth= 12000): 
-        # Note: cellwidth is in meters
-        neighboring_pixels= []
-        neighboring_pixels.append(Polygon([(x-2*cellwidth, y), (x, y+2*cellwidth), (x+2*cellwidth, y), (x, y-2*cellwidth)])) # 4 neighboring pixels
-        return neighboring_pixels[0]
-
-    burnarea_modis_12km_nonzero_df['neighboring_pixels']= burnarea_modis_12km_nonzero_df.apply(lambda x: find_neighboring_pixels(x['X'], x['Y']), axis=1)
+    burnarea_modis_12km_nonzero_df['neighboring_pixels']= burnarea_modis_12km_nonzero_df.apply(lambda x: find_neighboring_pixels(x['X'], x['Y'], nn= nn), axis=1)
 
     # Converting into geopandas data frame with origin as the geometry; only selecting fires in 2021 and 2022
     gdf= gpd.GeoDataFrame(burnarea_modis_12km_nonzero_df, geometry=gpd.points_from_xy(burnarea_modis_12km_nonzero_df["X"], burnarea_modis_12km_nonzero_df["Y"]), crs= 'EPSG:5070')
@@ -286,7 +286,7 @@ def init_fire_modis_gdf(burnarea_modis, start_year= 2021):
 
     gdf.sort_values(by= ['fire_indx'], inplace= True)
     gdf['final_area_ha']= final_area_ha_arr
-    gdf.reset_index().drop(columns= ['index'])
+    gdf= gdf.reset_index().drop(columns= ['index'])
 
     # Standardizing columns to match wildfire_gdf
     gdf['final_year']= gdf.time.dt.year
