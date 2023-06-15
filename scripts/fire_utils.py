@@ -1170,11 +1170,14 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
                 
             if scaled == True:
                 endmon= startmon + totmonths
-                var_arr_train= xarray.concat([var_arr.where(var_arr.time < startmon, drop= True), var_arr.where(var_arr.time >= endmon, drop= True)], dim= "time")
-                if (seas_var == 'static') | (seas_var == 'annual'):
-                    var_arr= (var_arr - var_arr_train.mean(axis= (1, 2)))/var_arr_train.std(axis= (1, 2))
+                if (seas_var == 'static'):
+                    var_arr= (var_arr - var_arr.mean(axis= (1, 2), skipna= True))/var_arr.std(axis= (1, 2), skipna= True) # standardizing each grid cell in space
+                elif (seas_var == 'annual'):
+                    var_arr_train= var_arr.where((var_arr.time >= startmon) & (var_arr.time <= endmon)).mean(axis= 0, skipna= True) # mean over baseline period
+                    var_arr= (var_arr - var_arr_train.mean(axis= (0, 1), skipna= True))/var_arr_train.std(axis= (0, 1), skipna= True) # standardizing each grid cell in space
                 else:
-                    var_arr= (var_arr - var_arr_train.mean(axis= 0))/var_arr_train.std(axis= 0)
+                    var_arr_train= var_arr.where((var_arr.time >= startmon) & (var_arr.time <= endmon))
+                    var_arr= (var_arr - var_arr_train.mean(axis= 0, skipna= True))/var_arr_train.std(axis= 0, skipna= True) # standardizing each grid cell in time
             
         elif tscale == 'longterm':
             if seas_var == 'static':

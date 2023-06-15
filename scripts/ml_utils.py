@@ -1194,9 +1194,9 @@ def reg_fire_size_func(X_train_dat, y_train_dat, X_val_dat, y_val_dat, size_test
     mdn= MDN_size(layers= n_layers, neurons= n_neurons, components= n_comps, initializer= initializer, reg= regflag, regrate= regrate, dropout= doflag)
     mdn.compile(loss=loss_func, optimizer= tf.keras.optimizers.legacy.Adam(learning_rate= 1e-4), metrics=[acc_func]) # legacy Adam optimizer to account for slowness on M1/M2 chips
     if samp_weights:
-        h= mdn.fit(x= X_train_dat, y= y_train_dat, epochs= epochs, validation_data=(X_val_dat, y_val_dat), callbacks= [es_mon], batch_size= bs, sample_weight= samp_weight_arr, verbose=0)
+        h= mdn.fit(x= X_train_dat, y= y_train_dat, epochs= epochs, validation_data=(X_val_dat, y_val_dat), callbacks= [es_mon], batch_size= bs, sample_weight= samp_weight_arr, verbose=0) #
     else:
-        h= mdn.fit(x= X_train_dat, y= y_train_dat, epochs= epochs, validation_data=(X_val_dat, y_val_dat), callbacks= [es_mon], batch_size= bs, verbose=0)
+        h= mdn.fit(x= X_train_dat, y= y_train_dat, epochs= epochs, validation_data=(X_val_dat, y_val_dat), callbacks= [es_mon], batch_size= bs, verbose=0) #
 
     print("MDN trained for %d epochs"%len(h.history['loss']))
 
