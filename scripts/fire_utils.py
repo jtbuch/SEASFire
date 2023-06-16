@@ -485,11 +485,19 @@ def fire_tim_ind_func(filepath, start_year= 1984, final_year= 2019, antecedent= 
     clim_dates= num2date(clim_times[:], units=clim_times.units)
     
     if antecedent:
-        fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 3, 12, 15, 0, 0, 0, 0)) \
+        if pred_mon_ind == None: 
+            fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 3, 12, 15, 0, 0, 0, 0)) \
                                 & (clim_dates.data < DatetimeGregorian(final_year, 1, 15, 0, 0, 0, 0))
+        else:
+            fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 3, 12, 15, 0, 0, 0, 0)) \
+                                & (clim_dates.data < DatetimeGregorian(final_year, pred_mon_ind + 1, 15, 0, 0, 0, 0))
     elif mov_avg:
-        fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 2, 12, 15, 0, 0, 0, 0)) \
+        if pred_mon_ind == None: 
+            fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 2, 12, 15, 0, 0, 0, 0)) \
                                 & (clim_dates.data < DatetimeGregorian(final_year + 1, 1, 15, 0, 0, 0, 0))
+        else:
+            fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 2, 12, 15, 0, 0, 0, 0)) \
+                                & (clim_dates.data < DatetimeGregorian(final_year + 1, pred_mon_ind + 1, 15, 0, 0, 0, 0))
     else:
         if pred_mon_ind == None:
             fire_tim_ind= (clim_dates.data > DatetimeGregorian(start_year - 1, 12, 15, 0, 0, 0, 0)) \
@@ -602,7 +610,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
                 return pred_data[fire_tim_ind].values
             
         elif pred_season == "moving_average_2mo":
-            fire_tim_ind_mavg= fire_tim_ind_func(pred_file, start_year, final_year, mov_avg= True)
+            fire_tim_ind_mavg= fire_tim_ind_func(pred_file, start_year, final_year, mov_avg= True, pred_mon_ind= pred_mon_ind)
             seas_indx_1, seas_indx_2= tindx_func(startmon= 10, duration= 2, tim_size= tot_months, mov_avg= True)
             if savg:
                 return np.asarray([np.mean(np.mean(pred_data[fire_tim_ind_mavg][seas_indx_1[i]:seas_indx_2[i]], axis= (1, 2)), axis= 0) for i in range(len(seas_indx_1))])
@@ -611,7 +619,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
                 return np.asarray([np.mean(pred_data[fire_tim_ind_mavg][seas_indx_1[i]:seas_indx_2[i]], axis= 0) for i in range(len(seas_indx_1))])
         
         elif pred_season == "moving_average_3mo":
-            fire_tim_ind_mavg= fire_tim_ind_func(pred_file, start_year, final_year, mov_avg= True)
+            fire_tim_ind_mavg= fire_tim_ind_func(pred_file, start_year, final_year, mov_avg= True, pred_mon_ind= pred_mon_ind)
             seas_indx_1, seas_indx_2= tindx_func(startmon= 9, duration= 3, tim_size= tot_months, mov_avg= True)
             if savg:
                 return np.asarray([np.mean(np.mean(pred_data[fire_tim_ind_mavg][seas_indx_1[i]:seas_indx_2[i]], axis= (1, 2)), axis= 0) for i in range(len(seas_indx_1))])
@@ -619,7 +627,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
                 return np.asarray([np.mean(pred_data[fire_tim_ind_mavg][seas_indx_1[i]:seas_indx_2[i]], axis= 0) for i in range(len(seas_indx_1))])
         
         elif pred_season == "moving_average_4mo":
-            fire_tim_ind_mavg= fire_tim_ind_func(pred_file, start_year, final_year, mov_avg= True)
+            fire_tim_ind_mavg= fire_tim_ind_func(pred_file, start_year, final_year, mov_avg= True, pred_mon_ind= pred_mon_ind)
             seas_indx_1, seas_indx_2= tindx_func(startmon= 8, duration= 4, tim_size= tot_months, mov_avg= True)
             if savg:
                 return np.asarray([np.mean(np.mean(pred_data[fire_tim_ind_mavg][seas_indx_1[i]:seas_indx_2[i]], axis= (1, 2)), axis= 0) for i in range(len(seas_indx_1))])
@@ -627,7 +635,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
                 return np.asarray([np.mean(pred_data[fire_tim_ind_mavg][seas_indx_1[i]:seas_indx_2[i]], axis= 0) for i in range(len(seas_indx_1))])
             
         elif pred_season == "antecedent_avg":
-            fire_tim_ind_ant= fire_tim_ind_func(pred_file, start_year, final_year, antecedent= True)
+            fire_tim_ind_ant= fire_tim_ind_func(pred_file, start_year, final_year, antecedent= True, pred_mon_ind= pred_mon_ind)
             seas_indx_1, seas_indx_2= tindx_func(startmon= 2, duration= 20, tim_size= tot_months) #based on Park's 2019 paper "best" correlation
             if savg:
                 pred_data= np.asarray([np.mean(pred_data[fire_tim_ind_ant][seas_indx_1[i]:seas_indx_2[i]], axis=(1, 2)).values for i in range(len(seas_indx_1))])
@@ -638,23 +646,23 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
         
         elif pred_season == "antecedent_lag2":
             fire_tim_ind_ant= fire_tim_ind_func(pred_file, start_year, final_year, antecedent= True)
-            seas_indx_1, seas_indx_2= tindx_func(startmon= 0, duration= 12, tim_size= tot_months)
+            seas_indx_1, seas_indx_2= tindx_func(startmon= 0, duration= 12, tim_size= tot_months + (12 - pred_mon_ind))
             if savg:
                 pred_data= np.asarray([np.mean(pred_data[fire_tim_ind_ant][seas_indx_1[i]:seas_indx_2[i]], axis=(1, 2)).values for i in range(len(seas_indx_1))])
-                return np.repeat(np.mean(pred_data, axis= 1), 12) # assumption: antecedent precipitation is the same for all fire months
+                return np.repeat(np.mean(pred_data, axis= 1), 12)[0:tot_months] # assumption: antecedent precipitation is the same for all fire months
             else:
                 pred_data= np.asarray([np.mean(pred_data[fire_tim_ind_ant][seas_indx_1[i]:seas_indx_2[i]], axis= 0) for i in range(len(seas_indx_1))])
-                return np.kron(pred_data, np.ones((12, 1, 1))) # assumption: antecedent precipitation is the same for all fire months
+                return np.kron(pred_data, np.ones((12, 1, 1)))[0:tot_months] # assumption: antecedent precipitation is the same for all fire months
         
         elif pred_season == "antecedent_lag1":
             fire_tim_ind_ant= fire_tim_ind_func(pred_file, start_year, final_year, antecedent= True)
-            seas_indx_1, seas_indx_2= tindx_func(startmon= 12, duration= 12, tim_size= tot_months)
+            seas_indx_1, seas_indx_2= tindx_func(startmon= 12, duration= 12, tim_size= tot_months + (12 - pred_mon_ind))
             if savg:
                 pred_data= np.asarray([np.mean(pred_data[fire_tim_ind_ant][seas_indx_1[i]:seas_indx_2[i]], axis=(1, 2)).values for i in range(len(seas_indx_1))])
-                return np.repeat(np.mean(pred_data, axis= 1), 12) # assumption: antecedent precipitation is the same for all fire months
+                return np.repeat(np.mean(pred_data, axis= 1), 12)[0:tot_months] # assumption: antecedent precipitation is the same for all fire months
             else:
                 pred_data= np.asarray([np.mean(pred_data[fire_tim_ind_ant][seas_indx_1[i]:seas_indx_2[i]], axis= 0) for i in range(len(seas_indx_1))])
-                return np.kron(pred_data, np.ones((12, 1, 1))) # assumption: antecedent precipitation is the same for all fire months
+                return np.kron(pred_data, np.ones((12, 1, 1)))[0:tot_months] # assumption: antecedent precipitation is the same for all fire months
             
         elif pred_season == "annual":
             if savg:
@@ -934,12 +942,15 @@ def init_grid(firedat, res, tot_months):
 #def init_clim_pred_grid():
     
         
-def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_year= 2019, fire_grid= False): 
+def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_year= 2019, fire_grid= False, pred_mon_ind= None): 
     
     # function to allocate individual fires from the firelist.txt file to a raster grid of varying resolutions. This serves two roles: 1) allows the predictions of fire probability for individual grid cells;
     # 2) enables the calculation of a (weighted) average for climate variables for each fire.
     
-    tot_months= (final_year + 1 - start_year)*12
+    if final_year != 2023:
+        tot_months= (final_year + 1 - start_year)*12
+    else:
+        tot_months= (final_year - start_year)*12 + pred_mon_ind
     grid, rows, cols= init_grid(firedat, res, tot_months)
     cellwidth= int(re.findall(r'\d+', res)[0])*1000
     if res == '24km':
@@ -1136,7 +1147,7 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
                 gdf_var= pred_var
 
             clim_var_data= clim_pred_var(pred_file_indx= pred_findx_arr[pred_var], pred_seas_indx= pred_sindx_arr[seas_var], tscale= "monthly", savg= False, \
-                                                                                                                start_year= start_year, final_year= final_year)
+                                                                                                                start_year= start_year, final_year= final_year, seas_pred_flag= False, pred_mon_ind= pred_mon_ind)
         else:
             gdf_var= pred_var
 
@@ -1217,12 +1228,16 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
     
     return clim_fire_df
 
-def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, threshold= None, seas_arr= None):
+def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None, pred_mon_ind= None):
     
+    # threshold= None --> optional keyword argument for fire size
     #creates a dataframe with climate variables and fire frequencies at monthly and annual resolutions
     
-    clim_df= init_clim_fire_grid(res, tscale, start_year, final_year, scaled, startmon, totmonths, seas_arr) #time: ~ 8 mins
-    tot_months= (final_year + 1 - start_year)*12
+    clim_df= init_clim_fire_grid(res, tscale, start_year, final_year, scaled, startmon, totmonths, seas_arr= seas_arr, pred_mon_ind= pred_mon_ind) #time: ~ 8 mins
+    if final_year != 2023:
+        tot_months= (final_year + 1 - start_year)*12
+    else:
+        tot_months= (final_year - start_year)*12 + pred_mon_ind
     
     if tscale == 'monthly':
         clim_fire_grid_df= xarray.open_dataarray(data_dir + pred_input_path + 'climate/primary/tmax.nc').sel(time=slice('%s'%str(start_year), '%s'%str(final_year))).to_dataframe(name='Tmax').reset_index() #.dropna()
@@ -1230,7 +1245,8 @@ def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, fin
         reg_indx_arr= update_reg_indx(clim_fire_grid_gdf) #time: ~ 1.5 hrs
         clim_fire_grid_df['reg_indx']= reg_indx_arr
 
-        tmax_arr= xarray.DataArray(data= clim_pred_var(pred_file_indx= 1, pred_seas_indx= 1, tscale= "monthly", savg= False, start_year= start_year, final_year= final_year),
+        tmax_arr= xarray.DataArray(data= clim_pred_var(pred_file_indx= 1, pred_seas_indx= 1, tscale= "monthly", savg= False, start_year= start_year, \
+                                                       final_year= final_year, seas_pred_flag= False, pred_mon_ind= pred_mon_ind)[0:tot_months],
             dims=["month", "Y", "X"],
             coords=dict(
                 X=(["X"], np.linspace(0, 154, 155, dtype= np.int64)),
@@ -1243,10 +1259,10 @@ def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, fin
         if final_year < 2020:
             fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_data.h5').append(pd.read_hdf('../data/clim_fire_size_12km_test_data.h5'), ignore_index= True)
         else:
-            fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_w%d_data.h5'%final_year).append(pd.read_hdf('../data/clim_fire_size_12km_test_w%d_data.h5'%final_year),\
+            fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_w2022_data.h5').append(pd.read_hdf('../data/clim_fire_size_12km_test_w2022_data.h5'),\
                                                                                                                                                ignore_index= True)
-        if threshold != None:
-            fires_df= fires_df[fires_df['fire_size']/1e6 > 4].reset_index().drop(columns= ['index'])
+        #if threshold != None:
+        #    fires_df= fires_df[fires_df['fire_size']/1e6 > 4].reset_index().drop(columns= ['index'])
             
         for ind in tqdm(range(len(fires_df))):
             freqind= coord_df[(coord_df.X == fires_df.loc[[ind]]['grid_x'][ind]) & (coord_df.Y == fires_df.loc[[ind]]['grid_y'][ind]) \
