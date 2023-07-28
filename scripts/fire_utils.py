@@ -103,7 +103,7 @@ def coord_transform(coord_a, coord_b, input_crs= 'WGS84', output_crs= 'EPSG:5070
     #function to convert coordinates between different reference systems with a little help from pyproj.Transformer
     #custom crs i/o with https://gis.stackexchange.com/questions/427786/pyproj-and-a-custom-crs
     
-    transformer= Transformer.from_crs(input_crs, output_crs)
+    transformer= Transformer.from_crs(input_crs, output_crs, always_xy= True)
         
     # we add another if-else loop to account for differences in input size: for different sizes, we first construct a meshgrid,
     # before transforming coordinates. Thus, the output types will differ depending on the input.
@@ -553,7 +553,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
                          #11: ["landcover/fuel_winslow/study_regions/deadbiomass_litter.nc"], 12: ["landcover/fuel_winslow/study_regions/livebiomass_leaf.nc"], 13: ["landcover/fuel_winslow/study_regions/connectivity.nc"]37: ["population/silvis/PopDenOf10perkm_distance_interp.nc"], 38: ["population/silvis/house_density_interp.nc"], 39: ["lightning/strike_density_interp.nc"]
     else:
         pred_flabel_arr= {1: ["climate/primary/tmax.nc"], 2: ["climate/primary/vpd.nc"], 3: ["climate/primary/prec.nc"], 4: ["climate/primary/solar.nc"], 5: ["climate/primary/wind.nc"], \
-                         6: ["climate/primary/rh.nc"], 7: ["climate/primary/cape.nc"], 8: ["climate/primary/ffwi.nc"], 9: ["climate/primary/tmin.nc"], 10: ["climate/primary/swemean.nc"], \
+                         6: ["climate/primary/rh.nc"], 7: ["climate/primary/cape.nc"], 8: ["climate/primary/ffwi.nc"], 9: ["climate/primary/tmin.nc"], 10: ["nsidc/swemean.nc"], \
                          11: ["climate/primary/soilm_0_100cm.nc"], 12: ["climate/primary/scPDSI.nc"], 13: ["climate/from_daily/wind_max1.nc"], 14: ["climate/from_daily/wind_max3.nc"], \
                          15: ["climate/from_daily/tmax_max3.nc"], 16: ["climate/from_daily/tmax_max7.nc"], 17: ["climate/from_daily/tmin_max3.nc"], 18: ["climate/from_daily/tmin_max7.nc"], \
                          19: ["climate/from_daily/ffwi_max3.nc"], 20: ["climate/from_daily/ffwi_max7.nc"], 21: ["climate/from_daily/vpd_max3.nc"], 22: ["climate/from_daily/vpd_max7.nc"], \
@@ -1330,6 +1330,117 @@ def drop_col_func(mod_type, rh_flag= False, vpd_rh_flag= False, add_var_flag= Fa
             dropcollist.extend(np.append(['AvgVPD_2mo', 'Camp_num', 'Elev'], add_var_list))
     
     return dropcollist
+
+def clim_xarr_init(clim_df, input_var_arr, scaling_flag, tot_months, tstart_mon, trend_mons, start_mon, end_mon, xarr_end_date= '2023-05-01'):
+    # function to initialize clim_xarr for climatology and trend calculations
+    # input_var_arr --> array of input predictors 
+    # scaling_flag --> type of normalization to be applied to input predictors
+
+    clim_xarr= xarray.Dataset(
+                data_vars= dict(
+                    Tmax= (["time", "Y", "X"], clim_df['Tmax'].values.reshape(tot_months, 208, 155)),
+                    Solar= (["time", "Y", "X"], clim_df['Solar'].values.reshape(tot_months, 208, 155)),
+                    VPD= (["time", "Y", "X"], clim_df['VPD'].values.reshape(tot_months, 208, 155)),
+                    Tmin= (["time", "Y", "X"], clim_df['Tmin'].values.reshape(tot_months, 208, 155)),
+                    Prec= (["time", "Y", "X"], clim_df['Prec'].values.reshape(tot_months, 208, 155)),
+                    RH= (["time", "Y", "X"], clim_df['RH'].values.reshape(tot_months, 208, 155)),
+                    SM_0_100cm= (["time", "Y", "X"], clim_df['SM_0_100cm'].values.reshape(tot_months, 208, 155)),
+                    PDSI= (["time", "Y", "X"], clim_df['PDSI'].values.reshape(tot_months, 208, 155)),
+                    FFWI_max7= (["time", "Y", "X"], clim_df['FFWI_max7'].values.reshape(tot_months, 208, 155)),
+                    CAPE= (["time", "Y", "X"], clim_df['CAPE'].values.reshape(tot_months, 208, 155)),),
+                coords=dict(
+                    X=(["X"], np.linspace(0, 154, 155, dtype= np.int64)),
+                    Y=(["Y"], np.linspace(0, 207, 208, dtype= np.int64)),
+                    time= (["time"], pd.date_range(start='1952-01-01', end= xarr_end_date, freq='MS')),),) #np.linspace(0, tot_months- 1, tot_months, dtype= np.int64) 
+
+    for input_var in input_var_arr:
+        if scaling_flag == 'trend':
+            result = clim_xarr[input_var][tstart_mon:trend_mons, :, :].polyfit(dim = "time", deg = 1)
+            trend= result.polyfit_coefficients.sel(degree= 1).values
+            intercept= result.polyfit_coefficients.sel(degree= 0).values
+            date_ns_arr= np.array(clim_xarr.time - np.datetime64('1952-01-01'))/np.timedelta64(1, 'ns')
+
+            # multiply trend and intercept with time to get a (857, 208, 155) dimension array
+            trend= np.kron(trend[np.newaxis, :, :], date_ns_arr[:, np.newaxis, np.newaxis])
+            intercept= np.tile(intercept, (tot_months, 1, 1))
+            clim_xarr[input_var + '_trend']= xarray.DataArray(trend + intercept, dims=('time', 'Y', 'X'), coords={'time': clim_xarr.time.values, \
+                                                                                                                'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+            detrended_arr= clim_xarr[input_var] - clim_xarr[input_var + '_trend']
+            clim_xarr[input_var]= detrended_arr/detrended_arr.std(dim= 'time')
+            clim_xarr[input_var + '_std']= xarray.DataArray(np.tile(detrended_arr.std(dim= 'time'), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+        elif scaling_flag == 'trend_w_seasonal_cycle':
+            clim_xarr= clim_xarr.sel(time= (clim_xarr.time.dt.month >= start_mon) & (clim_xarr.time.dt.month <= end_mon))
+            target_mon_arr= np.arange(start_mon, end_mon + 1, 1)
+            ivar_mon_groups= clim_xarr[input_var][tstart_mon:trend_mons, :, :].groupby('time.month')
+            tot_mon_groups= clim_xarr[input_var].groupby('time.month')
+            trend_arr= []
+            intercept_arr= []
+            #detrended_std_xarr= []
+
+            for ivar in target_mon_arr: #ivar_mon_groups.groups.keys():
+                result= ivar_mon_groups[ivar].polyfit(dim = "time", deg = 1)
+                trend_arr.append(result.polyfit_coefficients.sel(degree= 1).values) 
+                intercept_arr.append(result.polyfit_coefficients.sel(degree= 0).values)
+
+                date_ns_arr= np.array((tot_mon_groups[target_mon_arr[0]].time - np.datetime64('1952-01-01'))/np.timedelta64(1, 'ns'))
+                trend_xarr= xarray.DataArray(data= np.kron(np.array(trend_arr)[0, :, :], date_ns_arr[:, np.newaxis, np.newaxis]), dims= ['time', 'Y', 'X'], \
+                                                                                                        coords= dict(time= tot_mon_groups[target_mon_arr[0]].time.values, Y= clim_xarr.Y.values, X= clim_xarr.X.values))
+                intercept_xarr= xarray.DataArray(data= np.kron(np.array(intercept_arr)[0, :, :], np.ones((len(tot_mon_groups[target_mon_arr[0]].time), 1, 1))), dims= ['time', 'Y', 'X'], \
+                                                                                                        coords= dict(time= tot_mon_groups[target_mon_arr[0]].time.values, Y= clim_xarr.Y.values, X= clim_xarr.X.values))
+                #detrended_std_xarr= xarray.DataArray(np.kron((tot_mon_groups[1] - trend_xarr - intercept_xarr).std(dim= 'time'), np.ones((len(tot_mon_groups[1].time), 1, 1))), dims= ['time', 'Y', 'X'], \
+                #                                                                                        coords= dict(time= tot_mon_groups[1].time.values, Y= clim_xarr.Y.values, X= clim_xarr.X.values))
+                                                                                            
+            for i in range(len(target_mon_arr)- 1):
+                date_ns_arr= np.array((tot_mon_groups[target_mon_arr[i+1]].time - np.datetime64('1952-01-01'))/np.timedelta64(1, 'ns'))
+                tmptrend_xarr= xarray.DataArray(np.kron(np.array(trend_arr)[i, :, :], date_ns_arr[:, np.newaxis, np.newaxis]), dims= ['time', 'Y', 'X'], \
+                                                                                        coords= dict(time= tot_mon_groups[target_mon_arr[i+1]].time.values, Y= clim_xarr.Y.values, X= clim_xarr.X.values))
+                tmpintercept_xarr= xarray.DataArray(np.kron(np.array(intercept_arr)[i, :, :], np.ones((len(tot_mon_groups[target_mon_arr[i+1]].time), 1, 1))), dims= ['time', 'Y', 'X'], \
+                                                                                        coords= dict(time= tot_mon_groups[target_mon_arr[i+1]].time.values, Y= clim_xarr.Y.values, X= clim_xarr.X.values))
+                tmpdetrended_std_xarr= xarray.DataArray(np.kron((tot_mon_groups[target_mon_arr[i+1]] - tmptrend_xarr - tmpintercept_xarr).std(dim= 'time'), np.ones((len(tot_mon_groups[target_mon_arr[i+1]].time), 1, 1))), dims= ['time', 'Y', 'X'], \
+                                                                                        coords= dict(time= tot_mon_groups[target_mon_arr[i+1]].time.values, Y= clim_xarr.Y.values, X= clim_xarr.X.values))
+                trend_xarr= xarray.concat([trend_xarr, tmptrend_xarr], dim= 'time')
+                intercept_xarr= xarray.concat([intercept_xarr, tmpintercept_xarr], dim= 'time')
+                #detrended_std_xarr= xarray.concat([detrended_std_xarr, tmpdetrended_std_xarr], dim= 'time')
+
+                trend_xarr= trend_xarr.sortby('time')
+                intercept_xarr= intercept_xarr.sortby('time')
+                #detrended_std_xarr= detrended_std_xarr.sortby('time')
+
+            clim_xarr[input_var + '_trend']= trend_xarr + intercept_xarr
+            detrended_std_xarr= (clim_xarr[input_var] - clim_xarr[input_var + '_trend']).std(dim= 'time') 
+            clim_xarr[input_var + '_std']= xarray.DataArray(np.tile(detrended_std_xarr, (len(clim_xarr.time.values), 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                    coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+            #detrended_std_xarr= xarray.where(detrended_std_xarr == 0, 0.001, detrended_std_xarr)
+            clim_xarr[input_var]= (clim_xarr[input_var] - clim_xarr[input_var + '_trend'])/detrended_std_xarr 
+            
+        elif scaling_flag == 'normalized':
+            clim_xarr[input_var + '_mean']= xarray.DataArray(np.tile(clim_xarr[input_var][:trend_mons, :, :].mean(dim= 'time'), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+            clim_xarr[input_var + '_std']= xarray.DataArray(np.tile(clim_xarr[input_var][:trend_mons, :, :].std(dim= 'time'), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+            clim_xarr[input_var]= (clim_xarr[input_var] - clim_xarr[input_var][:trend_mons, :, :].mean(dim= 'time'))/clim_xarr[input_var][:trend_mons, :, :].std(dim= 'time')
+        elif scaling_flag == 'minmax':
+            clim_xarr[input_var + '_min']= xarray.DataArray(np.tile(clim_xarr[input_var].min(axis= 0), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+            clim_xarr[input_var + '_max']= xarray.DataArray(np.tile(clim_xarr[input_var].max(axis= 0), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+            clim_xarr[input_var]= (clim_xarr[input_var] - clim_xarr[input_var].min(axis= 0))/(clim_xarr[input_var].max(axis= 0) - clim_xarr[input_var].min(axis= 0))
+        elif scaling_flag == 'hybrid':
+            if input_var == 'Prec':
+                clim_xarr[input_var + '_min']= xarray.DataArray(np.tile(clim_xarr[input_var].min(axis= 0), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+                clim_xarr[input_var + '_max']= xarray.DataArray(np.tile(clim_xarr[input_var].max(axis= 0), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+                clim_xarr[input_var]= (clim_xarr[input_var] - clim_xarr[input_var].min(axis= 0))/(clim_xarr[input_var].max(axis= 0) - clim_xarr[input_var].min(axis= 0))
+            else:
+                clim_xarr[input_var + '_mean']= xarray.DataArray(np.tile(clim_xarr[input_var][:trend_mons, :, :].mean(dim= 'time'), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+                clim_xarr[input_var + '_std']= xarray.DataArray(np.tile(clim_xarr[input_var][:trend_mons, :, :].std(dim= 'time'), (tot_months, 1, 1)), dims=('time', 'Y', 'X'), \
+                                                                                        coords={'time': clim_xarr.time.values, 'Y': clim_xarr.Y.values, 'X': clim_xarr.X.values})
+                clim_xarr[input_var]= (clim_xarr[input_var] - clim_xarr[input_var][:trend_mons, :, :].mean(dim= 'time'))/clim_xarr[input_var][:trend_mons, :, :].std(dim= 'time')
+    
+    return clim_xarr
 
 #archived function for indiviudal climate-fire correlations from Park's .nc file
 
