@@ -1616,7 +1616,7 @@ def grid_freq_predict(X_test_dat, freq_test_df= None, n_regs= 18, ml_model= None
     if shap_flag:
         freq_arr= []
         X_arr= np.array(X_test_dat, dtype= np.float32)
-        param_vec= ml_model.predict(x= tf.constant(X_arr))
+        param_vec= ml_model.predict(x= tf.constant(X_arr), verbose= 0)
         freq_samp= zipd_model(param_vec).sample(1000, seed= rseed)
         freq_arr.append(tf.cast(tf.reduce_mean(freq_samp, axis= 0), tf.int64).numpy())
         
@@ -1632,7 +1632,7 @@ def grid_freq_predict(X_test_dat, freq_test_df= None, n_regs= 18, ml_model= None
             for m in np.linspace(start_month, final_month - 1, tot_months, dtype= np.int64):
                 X_arr= np.array(X_test_dat.groupby('reg_indx').get_group(r+1).groupby('month').get_group(m).dropna().drop(columns= ['reg_indx', 'month']), dtype= np.float32)
                 if func_flag == 'zipd':
-                    param_vec= ml_model.predict(x= tf.constant(X_arr))
+                    param_vec= ml_model.predict(x= tf.constant(X_arr), verbose= 0)
                     freq_samp= zipd_model(param_vec).sample(1000, seed= rseed)
                     pred_freq.append(tf.reduce_sum(tf.cast(tf.reduce_mean(freq_samp, axis= 0), tf.int64)).numpy())
                     pred_freq_sig.append(np.sqrt(tf.reduce_sum(tf.pow(tf.cast(tf.math.reduce_std(freq_samp, axis= 0), tf.int64), 2)).numpy()).astype(np.int64))
@@ -1966,9 +1966,9 @@ def grid_size_pred_func(mdn_model, stat_model, max_size_arr, sum_size_arr, start
                         ml_param_grid.append([0])
                 else:
                     if freq_flag == 'ml':
-                        ml_param_vec= mdn_model.predict(x= np.array(X_freq_test_dat.iloc[fire_loc_arr[mindx]].drop(columns= ['CAPE', 'reg_indx', 'month']), dtype= np.float32)) #note: different indexing than the fire_size_test df
+                        ml_param_vec= mdn_model.predict(x= np.array(X_freq_test_dat.iloc[fire_loc_arr[mindx]].drop(columns= ['CAPE', 'reg_indx', 'month']), verbose= 0, dtype= np.float32)) #note: different indexing than the fire_size_test df
                     elif freq_flag == 'data':
-                        ml_param_vec= mdn_model.predict(x= np.array(X_size_test_dat.iloc[fire_loc_arr[mindx]], dtype= np.float32))
+                        ml_param_vec= mdn_model.predict(x= np.array(X_size_test_dat.iloc[fire_loc_arr[mindx]], verbose= 0, dtype= np.float32))
                     samp_arr= tf.concat([samp_arr, tf.reshape(stat_model(ml_param_vec).sample(nsamps, seed= seed), (nsamps, ml_param_vec.shape[0]))], axis= 1)
                     if debug:
                         fire_ind_grid.append(fire_loc_arr[mindx])
