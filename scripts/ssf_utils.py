@@ -15,7 +15,7 @@ import geopandas as gpd
 from geopandas.tools import sjoin
 import xarray as xr
 import rioxarray
-import xesmf as xe # for regridding
+# import xesmf as xe # for regridding
 
 # Date and time related libraries
 from dateutil.relativedelta import relativedelta
@@ -25,9 +25,13 @@ import datetime
 from shapely.geometry import Point, mapping
 from shapely.geometry.polygon import Polygon
 from pyproj import CRS, Transformer # for transforming projected coordinates to elliptical coordinates
+import tensorflow as tf
+import tensorflow_probability as tfp
+tfd= tfp.distributions
 
 #self-libraries
 from fire_utils import *
+from ml_utils import *
 
 def ds_latlon_subset(ds,area,latname='latitude',lonname='longitude'):
     """
@@ -113,3 +117,43 @@ def seas5_monthly_anomaly_func(pred_var, system= None, fyear= 2021, init_month= 
                 return ds_latlon_subset(seas5_anomalies_tmax.sel(time= '%s'%fyear + '-0%s'%init_month + '-01'), subarea)
         else:
             return seas5_anomalies_tmax
+        
+def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= None, pred_mon_arr= None, sav_flag= False, target_year= None):
+    """ 
+    Function to predict fire probability for a given month
+    
+    freq_id, seed: id and seed of trained ML freq model
+    X_tot_df: dataframe containing all predictor variables including nan
+    X_test_df: dataframe containing non-nan predictor variables
+    pred_mon_arr: array containing months to predict
+    sav_flag: flag to save predictions
+    target_year: year for which predictions are made
+    """
+
+    if seed == None:
+        mdn_zipd= tf.keras.models.load_model('../sav_files/fire_freq_mods/mdn_ds_%s'%freq_id, custom_objects= {'zipd_loss': zipd_loss, 'zipd_accuracy': zipd_accuracy})
+    else:
+        mdn_zipd= tf.keras.models.load_model('../sav_files/fire_freq_mods/mdn_ds_rs_%s'%freq_id + '_%s'%seed, custom_objects= {'zipd_loss': zipd_loss, 'zipd_accuracy': zipd_accuracy})
+
+    param_vec= []
+    for m in pred_mon_arr:
+        X_arr= np.array(X_test_df.groupby('month').get_group(m).drop(columns= ['reg_indx', 'month']), dtype= np.float32)
+        param_vec.append(mdn_zipd.predict(x= tf.constant(X_arr)))
+    param_vec= np.array(param_vec).reshape(len(pred_mon_arr)*23903, 3) #np.array(param_vec).reshape(3*23903, 3)
+
+    X_tot_df['pred_fire_prob']= np.zeros_like(X_tot_df['fire_freq'], dtype= np.float32)
+    X_tot_df.loc[~X_tot_df['Elev'].isna(), 'pred_fire_prob']= param_vec[:, 1] # choose grid cells where Elev is not NaN because it has the fewest NaNs
+    X_tot_df.loc[X_tot_df['Elev'].isna(), 'pred_fire_prob']= np.nan
+
+    pred_prob_xarr= xarray.DataArray(data= X_tot_df['pred_fire_prob'].to_numpy().reshape(len(pred_mon_arr), 208, 155),
+        dims=["month", "Y", "X"],
+        coords=dict(
+            X=(["X"], np.linspace(-2349250, -501250, 155)),
+            Y=(["Y"], np.linspace(3166500, 682500, 208)),
+            time= (["month"], np.linspace(0, len(pred_mon_arr) - 1, len(pred_mon_arr), dtype= np.int64)),),)
+    
+    if sav_flag:
+        pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/pred_prob_xarr_rs_%s'%freq_id + '_%d_'%seed + 'obs_%s.nc'%target_year)
+        return print('Saved fire probability xarray for %s'%target_year)
+    else:
+        return pred_prob_xarr
