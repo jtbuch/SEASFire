@@ -1483,7 +1483,7 @@ def reg_pred_freq(X_test_dat, freq_test_df, nregs, start_month, func_flag, run_i
 
 def rescale_factor_model(ml_freq_groups, regindx, tot_months, test_start, test_tot, input_type= 'std', pred_type= 'std', regtype= 'polynomial'):
     
-    # Uses a linear model to predict the std/mean of annual observed frequencies using mean annual predicted frequencies
+    # Uses a linear model to predict the annual std/mean of monthly observed frequencies using annual std/mean of monthly predicted frequencies
     
     ann_arr= np.arange(0, tot_months + 1, 12)
     ann_test_arr= np.arange(test_start, test_start + test_tot + 1, 12)
@@ -1616,7 +1616,7 @@ def grid_freq_predict(X_test_dat, freq_test_df= None, n_regs= 18, ml_model= None
     if shap_flag:
         freq_arr= []
         X_arr= np.array(X_test_dat, dtype= np.float32)
-        param_vec= ml_model.predict(x= tf.constant(X_arr), verbose= 0)
+        param_vec= ml_model.predict(x= tf.constant(X_arr))
         freq_samp= zipd_model(param_vec).sample(1000, seed= rseed)
         freq_arr.append(tf.cast(tf.reduce_mean(freq_samp, axis= 0), tf.int64).numpy())
         
@@ -1625,14 +1625,18 @@ def grid_freq_predict(X_test_dat, freq_test_df= None, n_regs= 18, ml_model= None
     
     else:
         tot_rfac_arr= []
+        X_test_reg_groups= X_test_dat.groupby('reg_indx')
+        freq_test_reg_groups= freq_test_df.groupby('reg_indx')
         for r in tqdm(range(n_regs)):  
             pred_freq= []
             pred_freq_sig= []
             freq_arr= []
+            X_test_mon_groups= X_test_reg_groups.get_group(r+1).groupby('month')
+            freq_test_mon_groups= freq_test_reg_groups.get_group(r+1).groupby('month')
             for m in np.linspace(start_month, final_month - 1, tot_months, dtype= np.int64):
-                X_arr= np.array(X_test_dat.groupby('reg_indx').get_group(r+1).groupby('month').get_group(m).dropna().drop(columns= ['reg_indx', 'month']), dtype= np.float32)
+                X_arr= np.array(X_test_mon_groups.get_group(m).dropna().drop(columns= ['reg_indx', 'month']), dtype= np.float32)
                 if func_flag == 'zipd':
-                    param_vec= ml_model.predict(x= tf.constant(X_arr), verbose= 0)
+                    param_vec= ml_model.predict(x= tf.constant(X_arr))
                     freq_samp= zipd_model(param_vec).sample(1000, seed= rseed)
                     pred_freq.append(tf.reduce_sum(tf.cast(tf.reduce_mean(freq_samp, axis= 0), tf.int64)).numpy())
                     pred_freq_sig.append(np.sqrt(tf.reduce_sum(tf.pow(tf.cast(tf.math.reduce_std(freq_samp, axis= 0), tf.int64), 2)).numpy()).astype(np.int64))
@@ -1644,8 +1648,7 @@ def grid_freq_predict(X_test_dat, freq_test_df= None, n_regs= 18, ml_model= None
                     freq_arr.append([1 if p > 0.5 else 0 for p in reg_predictions])
                     pred_freq.append(np.sum([1 if p > 0.5 else 0 for p in reg_predictions]))
 
-            obs_freqs= [np.sum(freq_test_df.groupby('reg_indx').get_group(r+1).groupby('month').get_group(m).fire_freq) \
-                                                                              for m in np.linspace(start_month, final_month - 1, tot_months, dtype= np.int64)]
+            obs_freqs= [np.sum(freq_test_mon_groups.get_group(m).fire_freq) for m in np.linspace(start_month, final_month - 1, tot_months, dtype= np.int64)]
             #tot_rfac_arr.append((np.std(obs_freqs)/np.std(pred_freq)))
             pred_freq_arr= [np.sum(freq_arr[m - start_month]) for m in np.linspace(start_month, final_month - 1, tot_months, dtype= np.int64)]
             reg_indx_arr= np.ones(tot_months, dtype= np.int64)*(r+1)
@@ -1966,9 +1969,9 @@ def grid_size_pred_func(mdn_model, stat_model, max_size_arr, sum_size_arr, start
                         ml_param_grid.append([0])
                 else:
                     if freq_flag == 'ml':
-                        ml_param_vec= mdn_model.predict(x= np.array(X_freq_test_dat.iloc[fire_loc_arr[mindx]].drop(columns= ['CAPE', 'reg_indx', 'month']), verbose= 0, dtype= np.float32)) #note: different indexing than the fire_size_test df
+                        ml_param_vec= mdn_model.predict(x= np.array(X_freq_test_dat.iloc[fire_loc_arr[mindx]].drop(columns= ['CAPE', 'reg_indx', 'month']), dtype= np.float32)) #note: different indexing than the fire_size_test df
                     elif freq_flag == 'data':
-                        ml_param_vec= mdn_model.predict(x= np.array(X_size_test_dat.iloc[fire_loc_arr[mindx]], verbose= 0, dtype= np.float32))
+                        ml_param_vec= mdn_model.predict(x= np.array(X_size_test_dat.iloc[fire_loc_arr[mindx]], dtype= np.float32))
                     samp_arr= tf.concat([samp_arr, tf.reshape(stat_model(ml_param_vec).sample(nsamps, seed= seed), (nsamps, ml_param_vec.shape[0]))], axis= 1)
                     if debug:
                         fire_ind_grid.append(fire_loc_arr[mindx])
