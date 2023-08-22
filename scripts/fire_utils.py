@@ -1312,13 +1312,13 @@ def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, fin
 def drop_col_func(mod_type, rh_flag= False, vpd_rh_flag= False, add_var_flag= False, add_var_list= None):
     
     if not rh_flag:
-        dropcollist= ['CAPE', 'Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'FFWI_max7', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', \
+        dropcollist= ['CAPE', 'Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'FFWI_max3', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', \
                              'Tmax_max7', 'VPD_max7', 'Tmin_max7', 'RH_min3']
     elif not vpd_rh_flag:
-        dropcollist= ['CAPE', 'Solar', 'Ant_Tmax', 'VPD', 'AvgVPD_3mo', 'FFWI_max7', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', \
+        dropcollist= ['CAPE', 'Solar', 'Ant_Tmax', 'VPD', 'AvgVPD_3mo', 'FFWI_max3', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', \
                              'Tmax_max7', 'VPD_max7', 'Tmin_max7', 'VPD_max3']
     else:
-        dropcollist= ['CAPE', 'Solar', 'Ant_Tmax', 'Ant_RH', 'Tmin', 'FFWI_max7', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', \
+        dropcollist= ['CAPE', 'Solar', 'Ant_Tmax', 'Ant_RH', 'Tmin', 'FFWI_max3', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', \
                              'Tmax_max7', 'VPD_max7', 'Tmin_max7', 'RH_min3']
     if mod_type == 'minimal':
         dropcollist.extend(['Camp_dist', 'Camp_num', 'Slope', 'Southness', 'VPD', 'Tmax', 'Tmax_max3', 'Tmin_max3', \

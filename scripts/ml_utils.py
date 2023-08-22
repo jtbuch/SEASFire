@@ -1909,7 +1909,7 @@ def grid_size_pred_func(mdn_model, stat_model, max_size_arr, sum_size_arr, start
                             debug= False, shap_flag= False, regindx= None, rescale= False, sf_flag= None, seed= None):
     
     # Given a NN model, the function returns the monthly burned area time series for all L3 regions
-    # TODO: include effect of frequency uncertainty
+    # todo: include effect of frequency uncertainty
     
     #tf.random.set_seed(seed)
     if seed == None:
