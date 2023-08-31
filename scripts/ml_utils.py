@@ -995,10 +995,10 @@ def fire_size_data(res= '12km', dropcols= ['CAPE', 'Solar', 'Ant_Tmax', 'RH', 'A
     testdf= pd.DataFrame({})
     if hyp_flag:
         for k in testfiregroups.groups.keys():
-            testdf= testdf.append(testfiregroups.get_group(k).loc[[testfiregroups.get_group(k)['cell_frac'].idxmax()]])
+            testdf= pd.concat([testdf, testfiregroups.get_group(k).loc[[testfiregroups.get_group(k)['cell_frac'].idxmax()]]], axis= 0, ignore_index= True)
     else:
         for k in tqdm(testfiregroups.groups.keys()):
-            testdf= testdf.append(testfiregroups.get_group(k).loc[[testfiregroups.get_group(k)['cell_frac'].idxmax()]]) 
+            testdf= pd.concat([testdf, testfiregroups.get_group(k).loc[[testfiregroups.get_group(k)['cell_frac'].idxmax()]]], axis= 0, ignore_index= True)
     fire_size_test= testdf.reset_index().drop(columns= ['index', 'cell_frac']) #pd.read_hdf(data_dir + 'clim_fire_size_%s_test_data.h5'%res)
     #fire_size_test.loc[:, 'Tmin']= fire_size_test['Tmax'] - fire_size_test['Tmin']
     
