@@ -10,7 +10,7 @@ We consider two initialization modes for constructing the input predictors for t
 
 The architecture of our seasonal fire forecasting system allow us to generate fire probability maps in each 12km x 12km grid cell across the study region. A preliminary forecast of fire probability for July and August 2023 using observations until May 2023 is shown below,
 
-![plot](./plots/pred_fire_prob_08_07_23_654_ens_mean_ja_2023.png)
+![plot](./plots/pred_fire_prob_08_07_23_654_ens_mean_as_2023.png)
 
 Future iterations will extend this framework to other fire response variables such as fire intensity and biomass emissions.
 
