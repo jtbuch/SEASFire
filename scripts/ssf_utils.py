@@ -16,6 +16,8 @@ from geopandas.tools import sjoin
 import xarray as xr
 import rioxarray
 import xesmf as xe # for regridding
+import pickle # for saving and loading models
+from pathlib import Path
 
 # Date and time related libraries
 from dateutil.relativedelta import relativedelta
@@ -54,6 +56,7 @@ def clim_xarr_init(clim_df, input_var_arr, scaling_flag, tstart_mon, trend_mons,
     # scaling_flag --> type of normalization to be applied to input predictors
     '''
 
+    tot_months= len(pd.date_range(start='1952-01-01', end= xarr_end_date, freq='MS'))
     clim_xarr= xarray.Dataset(
                 data_vars= dict(
                     Tmax= (["time", "Y", "X"], clim_df['Tmax'].values.reshape(tot_months, 208, 155)),
@@ -70,7 +73,6 @@ def clim_xarr_init(clim_df, input_var_arr, scaling_flag, tstart_mon, trend_mons,
                     X=(["X"], np.linspace(0, 154, 155, dtype= np.int64)),
                     Y=(["Y"], np.linspace(0, 207, 208, dtype= np.int64)),
                     time= (["time"], pd.date_range(start='1952-01-01', end= xarr_end_date, freq='MS')),),) #np.linspace(0, tot_months- 1, tot_months, dtype= np.int64) 
-    tot_months= len(pd.date_range(start='1952-01-01', end= xarr_end_date, freq='MS'))
     
     for input_var in input_var_arr:
         if scaling_flag == 'trend':
@@ -430,7 +432,10 @@ def ens_mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 
             pred_prob_xarr= ens_pred_prob_xarr.mean(dim= 'ens_no')
         elif statistic == 'std':
             pred_prob_xarr= ens_pred_prob_xarr.std(dim= 'ens_no')[(fmon - smon):(fmon - smon)+2].mean(dim= 'month')
-        n_fires_yr= pred_fire_df[pred_fire_df.month == (plot_yr - 1984)*12 + fmon]['pred_mean_freq'].sum()
+        if fmon == 9:
+            n_fires_yr= 11
+        else:
+            n_fires_yr= pred_fire_df[pred_fire_df.month == (plot_yr - 1984)*12 + fmon]['pred_mean_freq'].sum()
     else:
         ens_pred_prob_xarr= xarray.concat([xarray.open_dataarray('../sav_files/ssf_pred_files/statistical_forecasts/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + \
                                                                                             'df_%d'%ens_no + '_%s.nc'%plot_yr) for ens_no in range(51)], dim= 'ens_no')
@@ -446,6 +451,7 @@ def ens_mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 
 
     if statistic == 'mean':   
         return 10**(np.log10(pred_prob_xarr[(fmon - smon), :, :]) - np.log10(pred_prob_xarr_baseline) - np.log10(n_fires_baseline/n_fires_yr))
+        #return np.log10(pred_prob_xarr[(fmon - smon), :, :]), np.log10(pred_prob_xarr_baseline), np.log10(n_fires_baseline/n_fires_yr)
     elif statistic == 'std':
         return 10**(np.log10(pred_prob_xarr) - np.log10(pred_prob_xarr_baseline) - np.log10(n_fires_baseline/n_fires_yr))
     
@@ -741,7 +747,7 @@ def grid_ssf_size_func(mdn_model, stat_model, max_size_arr, sum_size_arr, pred_m
         
     return reg_size_df.astype({'month': 'int64'})
 
-def baseline_mon_arr_func(start_yr= 2000, end_yr= 2020, mindx= 6):
+def baseline_mon_arr_func(start_yr= 2000, end_yr= 2020, mindx= 6, base_yr= 1984):
 
     """
     Function to calculate the baseline months for a given month or list of months
@@ -756,7 +762,7 @@ def baseline_mon_arr_func(start_yr= 2000, end_yr= 2020, mindx= 6):
         junoctmons= baselinemons[baselinemons.month.isin(mindx)]
     else:
         junoctmons= baselinemons[baselinemons.month.isin([mindx])]
-    baseline_mon_arr= junoctmons.year*12 + junoctmons.month - (1984*12 + 1)
+    baseline_mon_arr= junoctmons.year*12 + junoctmons.month - (base_yr*12 + 1)
 
     return baseline_mon_arr
 
@@ -819,6 +825,106 @@ def obs_burned_area_ts(fire_size_df, pred_mons, regindx):
             oba_pred_arr.append(fire_size_reg_df[fire_size_reg_df.fire_month == m].fire_size.sum()/1e6)
     
     return np.array(oba_pred_arr)
+
+
+def ens_stat_forecast_func(climdf, pred_var, target_yr, samp_flag= True, debug= False):
+    
+    """
+    Function to generate ensemble members from a statistical forecast for a given prediction variable, target year, and prediction months
+
+    climdf: dataframe containing the climate data
+    pred_var: variable to be predicted
+    target_yr: target year for which the forecast is being made
+    pred_mons: prediction months
+    samp_flag: if True, return ensemble members; else, return mean and standard deviation of the ensemble members
+
+    to-do: include separate models for m, jja, and s
+    """
+    pred_mons= np.array([856, 857, 858, 859]) - (2023 - target_yr)*12
+    run_id_arr= ['normalized_lead1mo_seas_detrended', 'normalized_lead2mo_seas_detrended', 'normalized_lead3mo_seas_detrended', 'normalized_lead3mo_seas_detrended']
+    mb_frac= 0.1
+    n_lead_months_arr= [1, 2, 3, 3]
+
+    lead1mons_fcast_arr= pred_mons - 1
+    lead2mons_fcast_arr= pred_mons - 2
+    lead3mons_fcast_arr= pred_mons - 3
+
+    lead1mons_fcast_df= climdf[climdf['time'].isin(lead1mons_fcast_arr)].dropna().reset_index().drop(columns= ['index'])
+    lead2mons_fcast_df= climdf[climdf['time'].isin(lead2mons_fcast_arr)].dropna().reset_index().drop(columns= ['index'])
+    lead3mons_fcast_df= climdf[climdf['time'].isin(lead3mons_fcast_arr)].dropna().reset_index().drop(columns= ['index'])
+    pred_arr_dynamic= {'Tmax': ['Tmax', 'RH', 'SM_0_100cm', 'PDSI'], 'Prec': ['Prec', 'Tmax', 'RH', 'SM_0_100cm', 'PDSI', 'CAPE'], \
+                   'VPD': ['VPD', 'Tmax', 'Prec', 'RH', 'SM_0_100cm', 'PDSI'], 'FFWI': ['FFWI_max7', 'Tmax', 'Prec', 'RH', 'SM_0_100cm', 'PDSI'], \
+                    'Tmin': ['Tmin', 'Tmax', 'Prec', 'RH', 'SM_0_100cm', 'PDSI']}
+
+    tmax_xr= xarray.open_dataarray('../data/12km/climate/primary/tmax.nc') # for getting the lat/lon coordinates
+    ind_nan= climdf.groupby('time').get_group(list(climdf.groupby('time').groups.keys())[0]).dropna().index
+    len_xcoord= len(tmax_xr.X)
+    len_ycoord= len(tmax_xr.Y)
+
+    for i in range(len(pred_mons)):
+        run_id= run_id_arr[i]
+        n_lead_month= n_lead_months_arr[i]
+        if 'lead1mo' in run_id.split('_'):
+            leadmonsdf= lead1mons_fcast_df
+            leadsmons_fcast_arr= np.sort(lead1mons_fcast_arr)
+        elif 'lead2mo' in run_id.split('_'):
+            leadmonsdf= lead2mons_fcast_df
+            leadsmons_fcast_arr= np.sort(lead2mons_fcast_arr)
+        elif 'lead3mo' in run_id.split('_'):
+            leadmonsdf= lead3mons_fcast_df
+            leadsmons_fcast_arr= np.sort(lead3mons_fcast_arr)
+
+        ngb_path= 'ngb_%s'%pred_var + '_%s'%run_id + '_mb_%.2f.p'%(mb_frac)
+        file_path = Path.home()/'Desktop/seasonal_fire_pred/sav_files/ngb_mods'/ngb_path
+        with file_path.open("rb") as f:
+            ngb= pickle.load(f)
+
+        Y_dist_loc= []
+        Y_dist_scale= []
+        
+        m= leadsmons_fcast_arr[i]
+        #if debug:
+        #    return leadmonsdf
+        leadmonsdf_groups= leadmonsdf.groupby(['time'], as_index= False)
+        X_test= leadmonsdf_groups.get_group(m)
+        Y_test_std= climdf.dropna().groupby('time').get_group(m - (target_yr == 2023)*12 + n_lead_month)[pred_var + '_std'] # consider std and trend values of the same month in the previous year # - (12 - n_lead_months)
+        Y_test_mean= climdf.dropna().groupby('time').get_group(m - (target_yr == 2023)*12 + n_lead_month)[pred_var + '_trend']# ensure that Y is always the target variable and not a predictor
+
+        X_test_scaled= pd.concat([X_test[pred_arr_dynamic[pred_var]], X_test[['Elev', 'nino34', 'mei', 'rmm1', 'rmm2']]], axis= 1).replace(np.nan, 0)
+        poly = PolynomialFeatures(1)
+        X_test_poly= poly.fit_transform(X_test_scaled)
+            
+        tmplocarr= np.ones(len_xcoord*len_ycoord)*np.nan
+        tmpsigarr= np.ones(len_xcoord*len_ycoord)*np.nan
+        tmplocarr[ind_nan]= ngb.pred_dist(X_test_poly).params['loc']*Y_test_std  #+ Y_test_mean
+        tmpsigarr[ind_nan]= ngb.pred_dist(X_test_poly).params['scale']*Y_test_std
+        Y_dist_loc.append(tmplocarr)
+        Y_dist_scale.append(tmpsigarr)
+
+        if samp_flag:
+            if i== 0:
+                xarr_pred_samp_tyear= xarray.DataArray(np.random.normal(Y_dist_loc, Y_dist_scale).reshape(len_ycoord, len_xcoord), \
+                                                        coords= {'Y': tmax_xr.Y, 'X': tmax_xr.X}, dims= ['Y', 'X'])
+            else:
+                xarr_pred_samp_tyear= xarray.concat([xarr_pred_samp_tyear, xarray.DataArray(np.random.normal(Y_dist_loc, Y_dist_scale).reshape(len_ycoord, len_xcoord), \
+                                                        coords= {'Y': tmax_xr.Y, 'X': tmax_xr.X}, dims= ['Y', 'X'])], dim= 'time')
+        else:
+            if i== 0:
+                xarr_pred_loc_tyear= xarray.DataArray(np.array(Y_dist_loc).reshape(len_ycoord, len_xcoord), \
+                                                        coords= {'Y': tmax_xr.Y, 'X': tmax_xr.X}, dims= ['Y', 'X'])
+                xarr_pred_scale_tyear= xarray.DataArray(np.array(Y_dist_scale).reshape(len_ycoord, len_xcoord), \
+                                                        coords= {'Y': tmax_xr.Y, 'X': tmax_xr.X}, dims= ['Y', 'X'])
+            else:
+                xarr_pred_loc_tyear= xarray.concat([xarr_pred_loc_tyear, xarray.DataArray(np.array(Y_dist_loc).reshape(len_ycoord, len_xcoord), \
+                                                        coords= {'Y': tmax_xr.Y, 'X': tmax_xr.X}, dims= ['Y', 'X'])], dim= 'time')
+                xarr_pred_scale_tyear= xarray.concat([xarr_pred_scale_tyear, xarray.DataArray(np.array(Y_dist_scale).reshape(len_ycoord, len_xcoord), \
+                                                        coords= {'Y': tmax_xr.Y, 'X': tmax_xr.X}, dims= ['Y', 'X'])], dim= 'time')
+    
+    if samp_flag:
+        return xarr_pred_samp_tyear
+    else:
+        return xarr_pred_loc_tyear, xarr_pred_scale_tyear
+
 
 def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_flag= 'dynamical_forecasts', fcast_type= 'dual_init', \
                                                     pred_var_arr= ['Tmax', 'Prec', 'VPD', 'Tmin'], freq_id= '08_07_23', seed= 654, size_id= '08_21_23', debug= False):
@@ -888,38 +994,51 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
         
     max_fire_train_arr= np.asarray(max_fire_train_arr)
     sum_fire_train_arr= max_fire_size_sum_func(fire_size_df= fire_size_tot, final_month= (target_yr + 1 - 1984)*12) #update final month for 2023!
+
+    if firemon_pred_flag == 'statistical_forecasts':
+        climdf= pd.read_hdf('../data/clim_12km_1952_2023_data.h5')
+        input_var_arr= ['Tmax', 'Solar', 'VPD', 'Tmin', 'Prec', 'RH', 'SM_0_100cm', 'PDSI', 'FFWI_max7', 'CAPE']
+        scaling_flag= 'trend_w_seasonal_cycle' # 'normalized', 'trend' , 'trend_w_seasonal_cycle'
+        trend_mons= 700 #700 --> 2010; 792 --> 2018
+        tstart_mon= 0  # 336 --> 1980; 468 --> 1991
+        tot_months= len(climdf.month.unique())
+        if scaling_flag == 'trend_w_seasonal_cycle':
+            start_mon= 2
+            end_mon= 8
+
+        clim_xarr= clim_xarr_init(climdf, input_var_arr, scaling_flag, tstart_mon, trend_mons, start_mon, end_mon)
+
+        input_var_arr= np.append([i for i in clim_xarr.data_vars], ['Elev', 'time', 'X', 'Y', 'mei', 'nino34', 'rmm1', 'rmm2']) #'Southness', 
+        if scaling_flag == 'trend_w_seasonal_cycle':
+            totmonarr= np.sort(np.hstack([np.arange(m, 857, 12) for m in range(start_mon - 1, end_mon)]))
+            climdf= pd.concat([clim_xarr.to_dataframe().reset_index(), climdf[climdf.month.isin(totmonarr)][['Elev', 'mei', 'nino34', 'rmm1', 'rmm2']].reset_index(drop= True)], axis= 1) #'Southness', 
+        else:
+            climdf= pd.concat([clim_xarr.to_dataframe().reset_index(), climdf[['Elev', 'mei', 'nino34', 'rmm1', 'rmm2']]], axis= 1) #'Southness',
+        climdf.time= (climdf.time.dt.year*12 + climdf.time.dt.month) - (1952*12 + 1)
     
     for ens_no in tqdm(range(tot_ens_mems)):
         if firemon_pred_flag == 'statistical_forecasts':
-            run_id_arr= ['normalized_lead1mo_seas_detrended', 'normalized_lead2mo_seas_detrended', 'normalized_lead3mo_seas_detrended']
-            mb_frac= '0.1'
-            pred_tot_loc_df= pd.DataFrame([])
-            pred_tot_scale_df= pd.DataFrame([])
+            if target_yr != 2023:
+                fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
+            else:
+                fire_freq_df= pd.DataFrame({'fire_freq': np.zeros(len(tmax_xr[0].values.flatten())*len(pred_mon_arr), dtype= np.int64)})
+            tmpdf= clim_df[clim_df.month.isin([pred_mon_arr[0]])].drop(columns= pred_var_arr).drop(columns= 'fire_freq').reset_index(drop= True)
+            obsdf= pd.concat([tmpdf.replace(pred_mon_arr[0], m) for m in pred_mon_arr], ignore_index= True) 
 
-            for pred_var in pred_var_arr:
-                mon_ind= 0
-                pred_var_loc_df= pd.DataFrame([])
-                pred_var_scale_df= pd.DataFrame([])
-                for run_id in run_id_arr:
-                    pred_loc_xarr= xarray.open_dataarray('../sav_files/ngb_pred_files/%s'%pred_var + '_%s'%mb_frac + '_%s_ngb_loc.nc'%run_id)
-                    pred_scale_xarr= xarray.open_dataarray('../sav_files/ngb_pred_files/%s'%pred_var + '_%s'%mb_frac + '_%s_ngb_scale.nc'%run_id)
-                    pred_var_loc_df= pd.concat([pred_var_loc_df, pred_loc_xarr[-4+mon_ind, :, :].to_dataframe(pred_var).reset_index()], ignore_index= True)
-                    pred_var_scale_df= pd.concat([pred_var_scale_df, pred_scale_xarr[-4+mon_ind, :, :].to_dataframe(pred_var).reset_index()], ignore_index= True)
-                    mon_ind+= 1
-                
-                pred_tot_loc_df= pd.concat([pred_tot_loc_df, pred_var_loc_df], axis= 1).drop(columns= ['X', 'Y'])
-                pred_tot_scale_df= pd.concat([pred_tot_scale_df, pred_var_scale_df], axis= 1).drop(columns= ['X', 'Y'])
-
-            pred_tot_loc_df= pred_tot_loc_df.T.drop_duplicates().T
-            pred_tot_loc_df.rename(columns= {'FFWI': 'FFWI_max7'}, inplace= True) # rename 'FFWI' to 'FFWI_max7' in pred_tot_loc_df
-            pred_tot_scale_df= pred_tot_scale_df.T.drop_duplicates().T
-            pred_tot_scale_df.rename(columns= {'FFWI': 'FFWI_max7'}, inplace= True) # rename 'FFWI' to 'FFWI_max7' in pred_tot_scale_df
-            pred_tot_loc_df['month']= clim_df[clim_df.month.isin(pred_mon_arr)].month.values
-            pred_tot_scale_df['month']= clim_df[clim_df.month.isin(pred_mon_arr)].month.values
-
-            X_pred_ur_df= pd.concat([clim_df[clim_df.month.isin(pred_mon_arr)].drop(columns= ['Tmax', 'Prec',  'VPD', 'FFWI_max7', 'Tmin']).reset_index(drop= True), pred_tot_loc_df], axis= 1).drop(columns= ['time'])
-            X_pred_df= X_pred_ur_df[clim_df.columns].dropna().reset_index(drop= True)
-            X_pred_df= X_pred_df.T.drop_duplicates().T
+            seas_anomalies_df= pd.DataFrame([])
+            pred_var_tot_df= pd.DataFrame([])
+            for pred_var in tqdm(pred_var_arr):
+                stat_fcast_anomalies_conus= ens_stat_forecast_func(climdf= climdf, pred_var= pred_var, target_yr= target_yr, samp_flag= True)
+                pred_var_df= stat_fcast_anomalies_conus.to_dataframe(pred_var).reset_index()[pred_var]
+                pred_var_df/= pred_var_df.std() # standardizing the dynamical forecasts
+                pred_var_tot_df= pd.concat([pred_var_tot_df, pred_var_df], axis=1, ignore_index= True)
+            seas_anomalies_df= pd.concat([seas_anomalies_df, pred_var_tot_df], axis= 0, ignore_index= True)
+            seas_anomalies_df.rename(columns= {i: pred_var_arr[i] for i in range(len(pred_var_arr))}, inplace= True)
+            obsdf= pd.concat([obsdf, fire_freq_df], axis= 1)
+            
+            X_pred_ur_df= pd.concat([seas_anomalies_df, obsdf], axis= 1)
+            X_pred_ur_df.drop(columns= pred_drop_cols, inplace= True)
+            X_pred_df= X_pred_ur_df[X_pred_ur_df.columns].dropna()
         elif firemon_pred_flag == 'dynamical_forecasts':
             # Downscaling, regridding, and interpolating dynamical forecasts to match APW's 12km grid
             
