@@ -328,6 +328,154 @@ def seas5_monthly_anomaly_func(pred_var, system= None, fyear= 2021, init_month= 
                     return ds_latlon_subset(seas5_anomalies_tmin.sel(time= '%s'%fyear + '-0%s'%init_month + '-01'), subarea)
             else:
                 return seas5_anomalies_tmin
+
+def fire_pred_df_func(clim_df, target_yr, pred_mon_arr, pred_var_arr, firemon_pred_flag, sys_no= None, ens_no= None, pred_drop_cols= ['SWE_mean', 'SWE_max', 'AvgSWE_3mo'], rescale_flag= True, freq_flag= 'prediction'):
+
+    '''
+    Function to create a dataframe of fire predictors 
+
+    clim_df: dataframe with climate, vegetation, and human predictors
+    target_yr: year for which fire predictions are to be made
+    pred_mon_arr: array of months for which fire predictions are to be made
+    pred_var_arr: array of fire month climate variables 
+    firemon_pred_flag: statistical/dynamical forecasts or observations
+    ens_no: ensemble member number for dynamical forecasts
+    pred_drop_cols: columns to be dropped from the dataframe of fire predictors
+    rescale_flag: flag for rescaling fire predictors
+    freq_flag: flag for returning dataframe of fire predictors for single prediction or ensemble plots
+    '''
+    
+    tmax_xr= xarray.open_dataarray('../data/12km/climate/primary/tmax.nc')
+
+    if firemon_pred_flag == 'statistical_forecasts':
+        if target_yr != 2023:
+            fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
+        else:
+            fire_freq_df= pd.DataFrame({'fire_freq': np.zeros(len(tmax_xr[0].values.flatten())*len(pred_mon_arr), dtype= np.int64)})
+        tmpdf= clim_df[clim_df.month.isin([pred_mon_arr[0]])].drop(columns= pred_var_arr).drop(columns= 'fire_freq').reset_index(drop= True)
+        obsdf= pd.concat([tmpdf.replace(pred_mon_arr[0], m) for m in pred_mon_arr], ignore_index= True) 
+        
+        climdf= pd.read_hdf('../data/clim_12km_1952_2023_data.h5')
+        input_var_arr= ['Tmax', 'Solar', 'VPD', 'Tmin', 'Prec', 'RH', 'SM_0_100cm', 'PDSI', 'FFWI_max7', 'CAPE']
+        scaling_flag= 'trend_w_seasonal_cycle' # 'normalized', 'trend' , 'trend_w_seasonal_cycle'
+        trend_mons= 700 #700 --> 2010; 792 --> 2018
+        tstart_mon= 0  # 336 --> 1980; 468 --> 1991
+        tot_months= len(climdf.month.unique())
+        if scaling_flag == 'trend_w_seasonal_cycle':
+            start_mon= 2
+            end_mon= 8
+
+        clim_xarr= clim_xarr_init(climdf, input_var_arr, scaling_flag, tstart_mon, trend_mons, start_mon, end_mon)
+
+        input_var_arr= np.append([i for i in clim_xarr.data_vars], ['Elev', 'time', 'X', 'Y', 'mei', 'nino34', 'rmm1', 'rmm2']) #'Southness', 
+        if scaling_flag == 'trend_w_seasonal_cycle':
+            totmonarr= np.sort(np.hstack([np.arange(m, 857, 12) for m in range(start_mon - 1, end_mon)]))
+            climdf= pd.concat([clim_xarr.to_dataframe().reset_index(), climdf[climdf.month.isin(totmonarr)][['Elev', 'mei', 'nino34', 'rmm1', 'rmm2']].reset_index(drop= True)], axis= 1) #'Southness', 
+        else:
+            climdf= pd.concat([clim_xarr.to_dataframe().reset_index(), climdf[['Elev', 'mei', 'nino34', 'rmm1', 'rmm2']]], axis= 1) #'Southness',
+        climdf.time= (climdf.time.dt.year*12 + climdf.time.dt.month) - (1952*12 + 1)
+
+        seas_anomalies_df= pd.DataFrame([])
+        pred_var_tot_df= pd.DataFrame([])
+        for pred_var in tqdm(pred_var_arr):
+            stat_fcast_anomalies_conus= ens_stat_forecast_func(climdf= climdf, pred_var= pred_var, target_yr= target_yr, samp_flag= True)
+            pred_var_df= stat_fcast_anomalies_conus.to_dataframe(pred_var).reset_index()[pred_var]
+            pred_var_df/= pred_var_df.std() # standardizing the dynamical forecasts
+            pred_var_tot_df= pd.concat([pred_var_tot_df, pred_var_df], axis=1, ignore_index= True)
+        seas_anomalies_df= pd.concat([seas_anomalies_df, pred_var_tot_df], axis= 0, ignore_index= True)
+        seas_anomalies_df.rename(columns= {i: pred_var_arr[i] for i in range(len(pred_var_arr))}, inplace= True)
+        obsdf= pd.concat([obsdf, fire_freq_df], axis= 1)
+        
+        X_pred_ur_df= pd.concat([seas_anomalies_df, obsdf], axis= 1)
+        X_pred_ur_df.drop(columns= pred_drop_cols, inplace= True)
+        X_pred_df= X_pred_ur_df[X_pred_ur_df.columns].dropna()
+        
+    elif firemon_pred_flag == 'dynamical_forecasts':
+        # Downscaling, regridding, and interpolating dynamical forecasts to match APW's 12km grid
+        
+        sub = (51.6, -128, 26.5, -101) # North/West/South/East
+        ds_out = xr.Dataset(
+            {
+                "lat": (["lat"], np.arange(26.5, 51.6, 0.125), {"units": "degrees_north"}),
+                "lon": (["lon"], np.arange(-128, -101, 0.125), {"units": "degrees_west"}),
+            }
+            )
+        x_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[0], dims=('Y','X'))
+        y_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[1], dims=('Y','X'))
+
+        if target_yr != 2023:
+            fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
+        else:
+            fire_freq_df= pd.DataFrame({'fire_freq': np.zeros(len(tmax_xr[0].values.flatten())*len(pred_mon_arr), dtype= np.int64)})
+        seas_anomalies_df= pd.DataFrame([])
+        obsdf= pd.DataFrame([])
+        init_month_arr= [4, 6]
+        for indx in tqdm(range(len(init_month_arr))):
+            # repeats the dynamical forecasts for the first 3/last 2 months of the fire season depending on the initialization month
+            tmpdf= clim_df[clim_df.month.isin([pred_mon_arr[indx] - 1])].drop(columns= pred_var_arr).drop(columns= 'fire_freq').reset_index(drop= True)
+            if indx== 0:
+                tmppredarr= pred_mon_arr[0:3]
+            else:
+                tmppredarr= pred_mon_arr[3:5]
+            tmpdf= pd.concat([tmpdf.replace(pred_mon_arr[indx] - 1, m) for m in tmppredarr], ignore_index= True) 
+            obsdf= pd.concat([obsdf, tmpdf], axis= 0, ignore_index= True)
+            
+            pred_var_tot_df= pd.DataFrame([])
+            for pred_var in pred_var_arr:
+                seas5_anomalies_conus_regridded= seas5_monthly_anomaly_func(pred_var= pred_var, system= sys_no, fyear= target_yr, init_month= init_month_arr[indx], subarea= sub, regrid_scheme= 'bilinear', \
+                                                                                                                                                        dsout= ds_out, anom_type= 'raw')
+                seas5_anomalies_conus_regridded= seas5_anomalies_conus_regridded.interp({'lat':y_fire_grid, 'lon':x_fire_grid}, method='linear').load()
+                seas5_anomalies_conus_regridded= seas5_anomalies_conus_regridded.assign_coords({'X': (('X'), tmax_xr.X.data, {"units": "meters"}), \
+                                                                                                            'Y': (('Y'), tmax_xr.Y.data, {"units": "meters"})}).drop_vars(['lat','lon'])
+                pred_var_df= seas5_anomalies_conus_regridded[ens_no][indx+1:4].where(~np.isnan(tmax_xr[0].drop('time'))).to_dataframe(pred_var).reset_index()[pred_var]
+                pred_var_df/= pred_var_df.std() # standardizing the dynamical forecasts
+                pred_var_tot_df= pd.concat([pred_var_tot_df, pred_var_df], axis=1, ignore_index= True)
+            seas_anomalies_df= pd.concat([seas_anomalies_df, pred_var_tot_df], axis= 0, ignore_index= True)
+        seas_anomalies_df.rename(columns= {i: pred_var_arr[i] for i in range(len(pred_var_arr))}, inplace= True)
+        obsdf= pd.concat([obsdf, fire_freq_df], axis= 1)
+        
+        X_pred_ur_df= pd.concat([seas_anomalies_df, obsdf], axis= 1)
+        X_pred_ur_df.drop(columns= pred_drop_cols, inplace= True)
+        X_pred_df= X_pred_ur_df[X_pred_ur_df.columns].dropna()
+
+    elif firemon_pred_flag == 'observations':
+        X_pred_ur_df= clim_df[clim_df.month.isin(pred_mon_arr)]
+        X_pred_ur_df.drop(columns= pred_drop_cols, inplace= True)
+        X_pred_ur_df.reset_index(drop= True, inplace= True)
+        X_pred_df= X_pred_ur_df[X_pred_ur_df.columns].dropna() #.reset_index(drop= True)
+
+    ### Scaling predictors for forcing the trained fire model
+
+    n_features= 43 - len(pred_drop_cols) # 39/46 for df with rescaled/unscaled 2021-2020 data; 35/43 for df with rescaled/unscaled 2022 data
+    if not rescale_flag:
+        start_month= 444
+        tot_test_months= 36
+        end_month= start_month + tot_test_months
+        rseed= np.random.randint(1000)
+        clim_df= clim_df.dropna().reset_index().drop(columns=['index'])
+        fire_freq_test_ur_df= clim_df[(clim_df.month >= start_month) & (clim_df.month < end_month)]
+        fire_freq_train_ur_df= clim_df.drop(fire_freq_test_ur_df.index)
+
+        tmp_freq_df= X_pred_df[X_pred_df.iloc[:, 0:n_features].columns] 
+        X_pred_test_df= pd.DataFrame({})
+        scaler= StandardScaler().fit(fire_freq_train_ur_df.iloc[:, 0:n_features]) # scaling parameters derived from climatological data
+        X_pred_test_df[tmp_freq_df.columns]= scaler.transform(tmp_freq_df)
+
+        X_pred_test_df.loc[:, 'reg_indx']= X_pred_df.reg_indx
+        X_pred_test_df.loc[:, 'month']= X_pred_df.month
+        X_pred_test_df= X_pred_test_df.drop(columns=['Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'RH_min3', 'FFWI_max7', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', 'AvgVPD_2mo', \
+                                                            'Tmax_max7', 'VPD_max7', 'Tmin_max7', 'Elev', 'Delta_T', 'CAPE', 'Southness'])
+    else:
+        X_pred_test_df= X_pred_df[X_pred_df.iloc[:, 0:n_features].columns]
+        X_pred_test_df.loc[:, 'reg_indx']= X_pred_df.reg_indx
+        X_pred_test_df.loc[:, 'month']= X_pred_df.month
+        X_pred_test_df= X_pred_test_df.drop(columns=['Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'RH_min3', 'FFWI_max7', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', 'AvgVPD_2mo', \
+                                                            'Tmax_max7', 'VPD_max7', 'Tmin_max7', 'Elev', 'Delta_T', 'CAPE', 'Southness'])
+        
+    if freq_flag == 'ensemble':
+        return X_pred_ur_df[['reg_indx', 'month', 'fire_freq']], X_pred_test_df[['reg_indx', 'month']]
+    elif freq_flag == 'prediction':
+        return X_pred_ur_df, X_pred_test_df
         
 def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= None, pred_mon_arr= None, sav_flag= False, target_year= None, firemon_pred_flag= 'observations', ens_no= None):
     
@@ -952,21 +1100,16 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
     clim_df.loc[clim_df[clim_df.fire_freq > 1].index, 'fire_freq']= np.ones(len(clim_df[clim_df.fire_freq > 1].index), dtype= np.int64)
     pred_drop_cols= ['SWE_mean', 'SWE_max', 'AvgSWE_3mo']
     n_features= 43 - len(pred_drop_cols)
-    tmax_xr= xarray.open_dataarray('../data/12km/climate/primary/tmax.nc')
 
-    if firemon_pred_flag == 'dynamical_forecasts':
-        if fcast_type == 'dual_init':
-            pred_mon_arr=  np.array([460, 461, 462, 463, 464]) - (2022 - target_yr)*12
-            start_month= 5 # index of start month with January = 1
-            init_month_arr= [4, 6]
-        else:
-            pred_mon_arr=  np.array([461, 462, 463]) - (2022 - target_yr)*12
-            start_month= 6 # index of start month with January = 1
-            init_month_arr= [5]
-    else:
-        pred_mon_arr=  np.array([460, 461, 462, 463]) - (2022 - target_yr)*12
+    if fcast_type == 'dual_init':
+        pred_mon_arr=  np.array([460, 461, 462, 463, 464]) - (2022 - target_yr)*12
         start_month= 5 # index of start month with January = 1
-        
+        init_month_arr= [4, 6]
+    else:
+        pred_mon_arr=  np.array([461, 462, 463]) - (2022 - target_yr)*12
+        start_month= 6 # index of start month with January = 1
+        init_month_arr= [5]
+    
     start_year= 1984
     end_year= 2019
     tot_years= end_year - start_year + 1
@@ -1006,7 +1149,7 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
         scaling_flag= 'trend_w_seasonal_cycle' # 'normalized', 'trend' , 'trend_w_seasonal_cycle'
         trend_mons= 700 #700 --> 2010; 792 --> 2018
         tstart_mon= 0  # 336 --> 1980; 468 --> 1991
-        #tot_months= len(climdf.month.unique())
+        tot_months= len(climdf.month.unique())
         if scaling_flag == 'trend_w_seasonal_cycle':
             start_mon= 2
             end_mon= 8
@@ -1020,18 +1163,6 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
         else:
             climdf= pd.concat([clim_xarr.to_dataframe().reset_index(), climdf[['Elev', 'mei', 'nino34', 'rmm1', 'rmm2']]], axis= 1) #'Southness',
         climdf.time= (climdf.time.dt.year*12 + climdf.time.dt.month) - (1952*12 + 1)
-    elif firemon_pred_flag == 'dynamical_forecasts':
-        sub = (51.6, -128, 26.5, -101) # North/West/South/East
-        ds_out = xr.Dataset(
-            {"lat": (["lat"], np.arange(26.5, 51.6, 0.125), {"units": "degrees_north"}),
-            "lon": (["lon"], np.arange(-128, -101, 0.125), {"units": "degrees_west"}),
-            })
-        x_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[0], dims=('Y','X'))
-        y_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[1], dims=('Y','X'))
-        if target_yr != 2023:
-            fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
-        else:
-            fire_freq_df= pd.DataFrame({'fire_freq': np.zeros(len(tmax_xr[0].values.flatten())*len(pred_mon_arr), dtype= np.int64)})
     
     for ens_no in tqdm(range(tot_ens_mems)):
         if firemon_pred_flag == 'statistical_forecasts':
@@ -1044,7 +1175,7 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
 
             seas_anomalies_df= pd.DataFrame([])
             pred_var_tot_df= pd.DataFrame([])
-            for pred_var in pred_var_arr:
+            for pred_var in tqdm(pred_var_arr):
                 stat_fcast_anomalies_conus= ens_stat_forecast_func(climdf= climdf, pred_var= pred_var, target_yr= target_yr, samp_flag= True)
                 pred_var_df= stat_fcast_anomalies_conus.to_dataframe(pred_var).reset_index()[pred_var]
                 pred_var_df/= pred_var_df.std() # standardizing the dynamical forecasts
@@ -1053,62 +1184,61 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
             seas_anomalies_df.rename(columns= {i: pred_var_arr[i] for i in range(len(pred_var_arr))}, inplace= True)
             obsdf= pd.concat([obsdf, fire_freq_df], axis= 1)
             
+            X_pred_ur_df= pd.concat([seas_anomalies_df, obsdf], axis= 1)
+            X_pred_ur_df.drop(columns= pred_drop_cols, inplace= True)
+            X_pred_df= X_pred_ur_df[X_pred_ur_df.columns].dropna()
         elif firemon_pred_flag == 'dynamical_forecasts':
             # Downscaling, regridding, and interpolating dynamical forecasts to match APW's 12km grid
+            
+            sub = (51.6, -128, 26.5, -101) # North/West/South/East
+            ds_out = xr.Dataset(
+                {
+                    "lat": (["lat"], np.arange(26.5, 51.6, 0.125), {"units": "degrees_north"}),
+                    "lon": (["lon"], np.arange(-128, -101, 0.125), {"units": "degrees_west"}),
+                }
+                )
+            tmax_xr= xarray.open_dataarray('../data/12km/climate/primary/tmax.nc')
+            x_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[0], dims=('Y','X'))
+            y_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[1], dims=('Y','X'))
 
+            if target_yr != 2023:
+                fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
+            else:
+                fire_freq_df= pd.DataFrame({'fire_freq': np.zeros(len(tmax_xr[0].values.flatten())*len(pred_mon_arr), dtype= np.int64)})
             seas_anomalies_df= pd.DataFrame([])
             obsdf= pd.DataFrame([])
-            if fcast_type == 'dual_init':
-                for indx in range(len(init_month_arr)):
-                    # repeats the dynamical forecasts for the first 3/last 2 months of the fire season depending on the initialization month
-                    tmpdf= clim_df[clim_df.month.isin([pred_mon_arr[indx] - 1])].drop(columns= pred_var_arr).drop(columns= 'fire_freq').reset_index(drop= True)
-                    if indx== 0:
-                        tmppredarr= pred_mon_arr[0:3]
-                    else:
-                        tmppredarr= pred_mon_arr[3:5]
-                    tmpdf= pd.concat([tmpdf.replace(pred_mon_arr[indx] - 1, m) for m in tmppredarr], ignore_index= True) 
-                    obsdf= pd.concat([obsdf, tmpdf], axis= 0, ignore_index= True)
-                    
-                    pred_var_tot_df= pd.DataFrame([])
-                    for pred_var in pred_var_arr:
-                        seas5_anomalies_conus_regridded= seas5_monthly_anomaly_func(pred_var= pred_var, system= sys_no, fyear= target_yr, init_month= init_month_arr[indx], subarea= sub, regrid_scheme= 'bilinear', \
-                                                                                                                                                                dsout= ds_out, anom_type= 'raw')
-                        seas5_anomalies_conus_regridded= seas5_anomalies_conus_regridded.interp({'lat':y_fire_grid, 'lon':x_fire_grid}, method='linear').load()
-                        seas5_anomalies_conus_regridded= seas5_anomalies_conus_regridded.assign_coords({'X': (('X'), tmax_xr.X.data, {"units": "meters"}), \
-                                                                                                                    'Y': (('Y'), tmax_xr.Y.data, {"units": "meters"})}).drop_vars(['lat','lon'])
-                        pred_var_df= seas5_anomalies_conus_regridded[ens_no][indx+1:4].where(~np.isnan(tmax_xr[0].drop('time'))).to_dataframe(pred_var).reset_index()[pred_var]
-                        pred_var_df/= pred_var_df.std() # standardizing the dynamical forecasts
-                        pred_var_tot_df= pd.concat([pred_var_tot_df, pred_var_df], axis=1, ignore_index= True)
-                    seas_anomalies_df= pd.concat([seas_anomalies_df, pred_var_tot_df], axis= 0, ignore_index= True)
-                seas_anomalies_df.rename(columns= {i: pred_var_arr[i] for i in range(len(pred_var_arr))}, inplace= True)
-                obsdf= pd.concat([obsdf, fire_freq_df], axis= 1)
-            elif fcast_type == 'single_init':
-                tmpdf= clim_df[clim_df.month.isin([pred_mon_arr[0]])].drop(columns= pred_var_arr).drop(columns= 'fire_freq').reset_index(drop= True)
-                obsdf= pd.concat([tmpdf.replace(pred_mon_arr[0], m) for m in pred_mon_arr], ignore_index= True) 
-
-                seas_anomalies_df= pd.DataFrame([])
+            for indx in range(len(init_month_arr)):
+                # repeats the dynamical forecasts for the first 3/last 2 months of the fire season depending on the initialization month
+                tmpdf= clim_df[clim_df.month.isin([pred_mon_arr[indx] - 1])].drop(columns= pred_var_arr).drop(columns= 'fire_freq').reset_index(drop= True)
+                if indx== 0:
+                    tmppredarr= pred_mon_arr[0:3]
+                else:
+                    tmppredarr= pred_mon_arr[3:5]
+                tmpdf= pd.concat([tmpdf.replace(pred_mon_arr[indx] - 1, m) for m in tmppredarr], ignore_index= True) 
+                obsdf= pd.concat([obsdf, tmpdf], axis= 0, ignore_index= True)
+            
                 pred_var_tot_df= pd.DataFrame([])
-                for pred_var in tqdm(pred_var_arr):
+                for pred_var in pred_var_arr:
                     seas5_anomalies_conus_regridded= seas5_monthly_anomaly_func(pred_var= pred_var, system= sys_no, fyear= target_yr, init_month= init_month_arr[indx], subarea= sub, regrid_scheme= 'bilinear', \
-                                                                                                                                                                dsout= ds_out, anom_type= 'raw')
+                                                                                                                                                            dsout= ds_out, anom_type= 'raw')
                     seas5_anomalies_conus_regridded= seas5_anomalies_conus_regridded.interp({'lat':y_fire_grid, 'lon':x_fire_grid}, method='linear').load()
                     seas5_anomalies_conus_regridded= seas5_anomalies_conus_regridded.assign_coords({'X': (('X'), tmax_xr.X.data, {"units": "meters"}), \
-                                                                                                                    'Y': (('Y'), tmax_xr.Y.data, {"units": "meters"})}).drop_vars(['lat','lon'])
-                    pred_var_df= seas5_anomalies_conus_regridded[ens_no][0:5].where(~np.isnan(tmax_xr[0].drop('time'))).to_dataframe(pred_var).reset_index()[pred_var]
+                                                                                                                'Y': (('Y'), tmax_xr.Y.data, {"units": "meters"})}).drop_vars(['lat','lon'])
+                    pred_var_df= seas5_anomalies_conus_regridded[ens_no][indx+1:4].where(~np.isnan(tmax_xr[0].drop('time'))).to_dataframe(pred_var).reset_index()[pred_var]
                     pred_var_df/= pred_var_df.std() # standardizing the dynamical forecasts
                     pred_var_tot_df= pd.concat([pred_var_tot_df, pred_var_df], axis=1, ignore_index= True)
                 seas_anomalies_df= pd.concat([seas_anomalies_df, pred_var_tot_df], axis= 0, ignore_index= True)
-                seas_anomalies_df.rename(columns= {i: pred_var_arr[i] for i in range(len(pred_var_arr))}, inplace= True)
-                obsdf= pd.concat([obsdf, fire_freq_df], axis= 1)
+            seas_anomalies_df.rename(columns= {i: pred_var_arr[i] for i in range(len(pred_var_arr))}, inplace= True)
+            obsdf= pd.concat([obsdf, fire_freq_df], axis= 1)
             
-        X_pred_ur_df= pd.concat([seas_anomalies_df, obsdf], axis= 1)
-        X_pred_ur_df.drop(columns= pred_drop_cols, inplace= True)
-        X_pred_df= X_pred_ur_df[X_pred_ur_df.columns].dropna()
+            X_pred_ur_df= pd.concat([seas_anomalies_df, obsdf], axis= 1)
+            X_pred_ur_df.drop(columns= pred_drop_cols, inplace= True)
+            X_pred_df= X_pred_ur_df[X_pred_ur_df.columns].dropna()
 
-        X_pred_test_df= X_pred_df[X_pred_df.iloc[:, 0:n_features].columns]
-        X_pred_test_df.loc[:, 'reg_indx']= X_pred_df.reg_indx
-        X_pred_test_df.loc[:, 'month']= X_pred_df.month
-        X_pred_test_df= X_pred_test_df.drop(columns=['Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'RH_min3', 'FFWI_max7', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', 'AvgVPD_2mo', \
+            X_pred_test_df= X_pred_df[X_pred_df.iloc[:, 0:n_features].columns]
+            X_pred_test_df.loc[:, 'reg_indx']= X_pred_df.reg_indx
+            X_pred_test_df.loc[:, 'month']= X_pred_df.month
+            X_pred_test_df= X_pred_test_df.drop(columns=['Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'RH_min3', 'FFWI_max7', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', 'AvgVPD_2mo', \
                                                                 'Tmax_max7', 'VPD_max7', 'Tmin_max7', 'Elev', 'Delta_T', 'CAPE', 'Southness'])
         
         ## Fire frequency trends and locations
