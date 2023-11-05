@@ -473,7 +473,7 @@ def fire_pred_df_func(clim_df, target_yr, pred_mon_arr, pred_var_arr, firemon_pr
                                                             'Tmax_max7', 'VPD_max7', 'Tmin_max7', 'Elev', 'Delta_T', 'CAPE', 'Southness'])
         
     if freq_flag == 'ensemble':
-        return X_pred_ur_df[['reg_indx', 'month', 'fire_freq']], X_pred_test_df[['reg_indx', 'month']]
+        return X_pred_ur_df[['Tmax', 'reg_indx', 'month', 'fire_freq']], X_pred_test_df[['reg_indx', 'month']]
     elif freq_flag == 'prediction':
         return X_pred_ur_df, X_pred_test_df
         
