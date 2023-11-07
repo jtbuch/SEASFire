@@ -518,7 +518,7 @@ def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= No
         if firemon_pred_flag == 'observations':
             pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'obs_%s.nc'%target_year)
         elif firemon_pred_flag == 'dynamical_forecasts':
-            pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/dynamical_forecasts/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%target_year)
+            pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/dynamical_forecasts/%s'%target_year + '/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%target_year)
         else:
             pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/statistical_forecasts/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'sf_%d'%ens_no + '_%s.nc'%target_year)
         return print('Saved fire probability xarray for %s'%target_year)
@@ -1241,6 +1241,11 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
             X_pred_test_df= X_pred_test_df.drop(columns=['Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'RH_min3', 'FFWI_max7', 'Avgprec_4mo', 'Avgprec_2mo', 'AvgVPD_4mo', 'AvgVPD_2mo', \
                                                                 'Tmax_max7', 'VPD_max7', 'Tmin_max7', 'Elev', 'Delta_T', 'CAPE', 'Southness'])
         
+        ## Function to generate a spatial map of fire probability forecasts from a saved MDN model and save the resultant xarray for post-processing
+
+        fire_prob_pred_func(freq_id= freq_id, seed= seed, X_tot_df= X_pred_ur_df, X_test_df= X_pred_test_df, pred_mon_arr= pred_mon_arr, sav_flag= True, target_year= target_yr, \
+                                                                                                                            firemon_pred_flag= firemon_pred_flag, ens_no= (ens_no))
+        
         ## Fire frequency trends and locations
 
         mdn_freq_test_df= grid_ssf_freq_predict(X_test_dat= X_pred_test_df, freq_test_df= X_pred_df, n_regs= nregions, ml_model= mdn_zipd, func_flag= 'zipd', \
@@ -1281,29 +1286,24 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
             else:
                 X_pred_ur_df.to_hdf('../sav_files/ssf_pred_files/' + '%s'%firemon_pred_flag + '/%s_dataframe'%freqlabel + '_%s'%freq_id + '_%d'%seed +  '_%d'%(ens_no) +\
                                                                                                                                              '_%d.h5'%target_yr, key= 'df', mode= 'w')
+                        
+            ## Fire size trends and locations
 
-        ## Function to generate a spatial map of fire probability forecasts from a saved MDN model and save the resultant xarray for post-processing
-
-        fire_prob_pred_func(freq_id= freq_id, seed= seed, X_tot_df= X_pred_ur_df, X_test_df= X_pred_test_df, pred_mon_arr= pred_mon_arr, sav_flag= True, target_year= target_yr, \
-                                                                                                                            firemon_pred_flag= firemon_pred_flag, ens_no= (ens_no))
-        
-        ## Fire size trends and locations
-
-        mdn_gpd_mod= tf.keras.models.load_model('../sav_files/fire_size_mods/mdn_gpd_size_model_%s'%size_id, custom_objects= {'gpd_loss': gpd_loss, 'gpd_accuracy': gpd_accuracy})
-        mdn_gpd_ext_mod= tf.keras.models.load_model('../sav_files/fire_size_mods/mdn_gpd_ext_size_model_%s'%size_id, custom_objects= {'gpd_loss': gpd_loss, 'gpd_accuracy': gpd_accuracy})
-        X_sizes_test_df= X_pred_ur_df.drop(columns= ['Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'RH_min3', 'FFWI_max7', 'Avgprec_4mo',  'Avgprec_2mo', 'AvgVPD_4mo', 'AvgVPD_2mo', 'Tmax_max7', \
-                                                                                'VPD_max7', 'Tmin_max7', 'Elev', 'Delta_T', 'CAPE', 'Southness', 'X', 'Y', 'fire_freq', 'pred_fire_prob'])
-        
-        for sizelabel in ['gpd', 'gpd_ext']:
-            if sizelabel == 'gpd_ext':
-                reg_gpd_ml_pred_size_df= grid_ssf_size_func(mdn_model= mdn_gpd_ext_mod, stat_model= gpd_model, max_size_arr= max_fire_train_arr, sum_size_arr= sum_fire_train_arr, pred_mon_flag= True, pred_mons= pred_mon_arr, \
-                                                    nsamps= 1000, loc_df= freq_loc_df, ml_freq_df= mdn_freq_test_df, X_test_dat= X_sizes_test_df)
-            elif sizelabel == 'gpd':
-                reg_gpd_ml_pred_size_df= grid_ssf_size_func(mdn_model= mdn_gpd_mod, stat_model= gpd_model, max_size_arr= max_fire_train_arr, sum_size_arr= sum_fire_train_arr, pred_mon_flag= True, pred_mons= pred_mon_arr, \
-                                                    nsamps= 1000, loc_df= freq_loc_df, ml_freq_df= mdn_freq_test_df, X_test_dat= X_sizes_test_df)
-            if firemon_pred_flag == 'observations':
-                reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
-                                                                                                                + '_%s'%sizelabel + '_%s.h5'%target_yr, key= 'df', mode= 'w')
-            else:
-                reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/' + '%s'%firemon_pred_flag + '/pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
-                                                                                                            + '_%s'%sizelabel + '_%d'%(ens_no) + '_%s.h5'%target_yr, key= 'df', mode= 'w')
+            mdn_gpd_mod= tf.keras.models.load_model('../sav_files/fire_size_mods/mdn_gpd_size_model_%s'%size_id, custom_objects= {'gpd_loss': gpd_loss, 'gpd_accuracy': gpd_accuracy})
+            mdn_gpd_ext_mod= tf.keras.models.load_model('../sav_files/fire_size_mods/mdn_gpd_ext_size_model_%s'%size_id, custom_objects= {'gpd_loss': gpd_loss, 'gpd_accuracy': gpd_accuracy})
+            X_sizes_test_df= X_pred_ur_df.drop(columns= ['Solar', 'Ant_Tmax', 'RH', 'Ant_RH', 'RH_min3', 'FFWI_max7', 'Avgprec_4mo',  'Avgprec_2mo', 'AvgVPD_4mo', 'AvgVPD_2mo', 'Tmax_max7', \
+                                                                                    'VPD_max7', 'Tmin_max7', 'Elev', 'Delta_T', 'CAPE', 'Southness', 'X', 'Y', 'fire_freq', 'pred_fire_prob'])
+            
+            for sizelabel in ['gpd', 'gpd_ext']:
+                if sizelabel == 'gpd_ext':
+                    reg_gpd_ml_pred_size_df= grid_ssf_size_func(mdn_model= mdn_gpd_ext_mod, stat_model= gpd_model, max_size_arr= max_fire_train_arr, sum_size_arr= sum_fire_train_arr, pred_mon_flag= True, pred_mons= pred_mon_arr, \
+                                                        nsamps= 1000, loc_df= freq_loc_df, ml_freq_df= mdn_freq_test_df, X_test_dat= X_sizes_test_df)
+                elif sizelabel == 'gpd':
+                    reg_gpd_ml_pred_size_df= grid_ssf_size_func(mdn_model= mdn_gpd_mod, stat_model= gpd_model, max_size_arr= max_fire_train_arr, sum_size_arr= sum_fire_train_arr, pred_mon_flag= True, pred_mons= pred_mon_arr, \
+                                                        nsamps= 1000, loc_df= freq_loc_df, ml_freq_df= mdn_freq_test_df, X_test_dat= X_sizes_test_df)
+                if firemon_pred_flag == 'observations':
+                    reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
+                                                                                                                    + '_%s'%sizelabel + '_%s.h5'%target_yr, key= 'df', mode= 'w')
+                else:
+                    reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/' + '%s'%firemon_pred_flag + '/pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
+                                                                                                                + '_%s'%sizelabel + '_%d'%(ens_no) + '_%s.h5'%target_yr, key= 'df', mode= 'w')
