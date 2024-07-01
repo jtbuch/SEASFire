@@ -345,7 +345,7 @@ def fire_pred_df_func(clim_df, target_yr, pred_mon_arr, pred_var_arr, firemon_pr
     freq_flag: flag for returning dataframe of fire predictors for single prediction or ensemble plots
     '''
     
-    tmax_xr= xarray.open_dataarray('../data/12km/climate/primary/tmax.nc')
+    tmax_xr= xarray.open_dataarray('../data/12km/climate/2023/primary/tmax.nc')
 
     if firemon_pred_flag == 'statistical_forecasts':
         if target_yr != 2023:
@@ -503,9 +503,10 @@ def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= No
         param_vec.append(mdn_zipd.predict(x= tf.constant(X_arr)))
     param_vec= np.array(param_vec).reshape(len(pred_mon_arr)*23903, 3) #np.array(param_vec).reshape(3*23903, 3)
 
+    # script to convert predicted fire probability in non-nan grid cells to a xarray with nan grid cells
     X_tot_df['pred_fire_prob']= np.zeros_like(X_tot_df['fire_freq'], dtype= np.float32)
-    X_tot_df.loc[~X_tot_df['Elev'].isna(), 'pred_fire_prob']= param_vec[:, 1] # choose grid cells where Elev is not NaN because it has the fewest NaNs
-    X_tot_df.loc[X_tot_df['Elev'].isna(), 'pred_fire_prob']= np.nan
+    X_tot_df.loc[~X_tot_df['Elev'].isna(), 'pred_fire_prob']= param_vec[:, 1] # 1 --> rate parameter as mean fire probability
+    X_tot_df.loc[X_tot_df['Elev'].isna(), 'pred_fire_prob']= np.nan # choose grid cells where Elev is not NaN because it has the fewest NaNs
 
     pred_prob_xarr= xarray.DataArray(data= X_tot_df['pred_fire_prob'].to_numpy().reshape(len(pred_mon_arr), 208, 155),
         dims=["month", "Y", "X"],
@@ -569,11 +570,11 @@ def ens_mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 
     """
     
     if firemon_pred_flag == 'dynamical_forecasts':
-        ens_pred_prob_xarr= xarray.concat([xarray.open_dataarray('../sav_files/ssf_pred_files/dynamical_forecasts/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + \
+        ens_pred_prob_xarr= xarray.concat([xarray.open_dataarray('../sav_files/ssf_pred_files/dynamical_forecasts/%s'%plot_yr + '/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + \
                                                                                             'df_%d'%ens_no + '_%s.nc'%plot_yr) for ens_no in range(51)], dim= 'ens_no')
         mdn_tot_df= pd.DataFrame([])
         for ens_no in range(51):
-            mdn_tmp_df= pd.read_hdf('../sav_files/fire_freq_pred_dfs/dynamical_forecasts/mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%ens_no + '_%d.h5'%plot_yr)
+            mdn_tmp_df= pd.read_hdf('../sav_files/fire_freq_pred_dfs/dynamical_forecasts/%s'%plot_yr + '/mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%ens_no + '_%d.h5'%plot_yr)
             mdn_tot_df= pd.concat([mdn_tot_df, mdn_tmp_df], axis= 0)
         pred_fire_df= mdn_tot_df.groupby(mdn_tot_df.index).mean().round().astype(int)
         if statistic == 'mean':

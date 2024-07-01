@@ -297,7 +297,7 @@ def init_fire_modis_gdf(burnarea_modis, start_year= 2021, nn= 2):
     gdf['intagncy_name']= np.ones(len(gdf.index), dtype= float)*np.nan
     gdf['MTBS_name']= np.ones(len(gdf.index), dtype= float)*np.nan
 
-    gdf_lat, gdf_lon= coord_transform(gdf['X'], gdf['Y'], input_crs= 'EPSG:5070', output_crs= 'EPSG:4326')
+    gdf_lon, gdf_lat= coord_transform(gdf['X'], gdf['Y'], input_crs= 'EPSG:5070', output_crs= 'EPSG:4326')
 
     gdf['final_lat']= gdf_lat
     gdf['final_lon']= gdf_lon
