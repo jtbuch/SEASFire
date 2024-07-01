@@ -814,6 +814,80 @@ def loc_ind_ssf_func(loc_df, ml_freq_df, X_test_dat, n_regs= 18, pred_mon_flag= 
 
     return pred_loc_arr
 
+
+def fire_freq_pred_func(target_yr, firemon_pred_flag= 'dynamical_forecasts', ens_no= None, freq_id= None, seed= None, freqlabel= None):
+
+    """
+    Function to predict fire frequency for a given year using a trained ML model
+
+    target_yr: year for which predictions are made
+    firemon_pred_flag: flag to indicate whether predictions are made for observations, dynamical forecasts or statistical forecasts
+    ens_no: ensemble member number for dynamical or statistical forecasts
+    freq_id: id of trained ML freq model
+    seed: seed of trained ML freq model
+    freqlabel: 'pred_mean_freq' or 'pred_high_2sig' or 'pred_low_2sig'
+    """
+
+    if target_yr != 2023:
+        clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w2022_rescaled_data.h5')
+        sys_no= None
+    else:
+        clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w2023_rescaled_data.h5')
+        sys_no= 51
+    clim_df.loc[clim_df[clim_df.fire_freq > 1].index, 'fire_freq']= np.ones(len(clim_df[clim_df.fire_freq > 1].index), dtype= np.int64)
+
+    pred_var_arr= ['Tmax', 'Prec', 'VPD', 'Tmin'] #'VPD', 'FFWI',
+    if target_yr == 'baseline':
+        pred_mon_arr= baseline_mon_arr_func(start_yr= 2001, end_yr= 2019, mindx= [5, 6, 7, 8, 9]).values # np.sort(np.append(np.append(np.arange(209, 426, 12), np.arange(210, 427, 12)), np.arange(211, 428, 12))) #2001-2020 
+    else:
+        pred_mon_arr=  np.array([460, 461, 462, 463, 464]) - (2022 - target_yr)*12  #464
+
+    X_pred_ur_df, X_pred_test_df= fire_pred_df_func(clim_df, target_yr, pred_mon_arr, pred_var_arr, firemon_pred_flag, sys_no= sys_no, ens_no= ens_no, freq_flag= 'prediction') #freq_flag= 'ensemble' or 'prediction'
+
+    start_year= 1984
+    end_year= 2019
+    tot_years= end_year - start_year + 1
+    start_month= 5 # index of forecast start month with January = 1 
+    tot_months= len(pred_mon_arr)
+    seas_mon_arr= baseline_mon_arr_func(start_yr= start_year, end_yr= end_year, mindx= np.arange(0, tot_months, 1) + start_month)
+
+    # load predicted fire frequency to calculate rescaling factor
+    mdn_freq_train_ur_df= pd.read_hdf('../sav_files/fire_freq_pred_dfs/mdn_ds_%s'%freq_id + '_mon_fire_freq_%s.h5'%seed) 
+    mdn_freq_train_ur_df= mdn_freq_train_ur_df.reset_index().rename(columns= {'index': 'month'})
+    mdn_freq_train_df= mdn_freq_train_ur_df[mdn_freq_train_ur_df.month.isin(seas_mon_arr)].reset_index(drop= True)
+
+    if seed == None:
+        mdn_zipd= tf.keras.models.load_model('../sav_files/fire_freq_mods/mdn_ds_%s'%freq_id, custom_objects= {'zipd_loss': zipd_loss, 'zipd_accuracy': zipd_accuracy})
+    else:
+        mdn_zipd= tf.keras.models.load_model('../sav_files/fire_freq_mods/mdn_ds_rs_%s'%freq_id + '_%s'%seed, custom_objects= {'zipd_loss': zipd_loss, 'zipd_accuracy': zipd_accuracy})
+    mdn_freq_test_df= grid_ssf_freq_predict(X_test_dat= X_pred_test_df, freq_test_df= X_pred_ur_df.dropna(), n_regs= 18, ml_model= mdn_zipd, func_flag= 'zipd', pred_mon_flag= True, \
+                                                                                                                                        pred_mons= pred_mon_arr, loc_flag= False, rseed= 87)
+    rescale_fac_df= calib_ssf_freq_predict(freq_train_df= mdn_freq_train_df, freq_test_df= mdn_freq_test_df, n_regs= 18, n_train_years= tot_years, n_pred_mons= tot_months, \
+                                                                                                                        input_type= 'mean', pred_type= 'mean', regtype= 'linear')
+    scale_fac= np.array(rescale_fac_df['pred_obs_freq']/rescale_fac_df['pred_freq'])
+    scale_fac[np.isinf(scale_fac)]= 0
+    scale_fac[scale_fac < 0]= 0
+
+    mdn_freq_test_df['pred_mean_freq']= np.floor(mdn_freq_test_df['pred_mean_freq']*scale_fac)
+    mdn_freq_test_df['pred_high_2sig']= np.floor(mdn_freq_test_df['pred_high_2sig']*scale_fac)
+    mdn_freq_test_df['pred_low_2sig']= np.floor(mdn_freq_test_df['pred_low_2sig']*scale_fac)
+
+    freq_loc_df= grid_ssf_freq_predict(X_test_dat= X_pred_test_df, freq_test_df= X_pred_ur_df.dropna(), n_regs= 18, ml_model= mdn_zipd, func_flag= 'zipd', pred_mon_flag= True, \
+                                                                                                            pred_mons= pred_mon_arr, loc_flag= True, rseed= 87)
+    
+    pred_loc_arr= loc_ind_ssf_func(loc_df= freq_loc_df, ml_freq_df= mdn_freq_test_df, X_test_dat= X_pred_test_df, pred_mon_flag= True, pred_mons= pred_mon_arr, freqlabel= freqlabel)
+    X_pred_ur_df['pred_fire_freq']= np.zeros_like(X_pred_ur_df['fire_freq'])
+    for r in tqdm(range(18)):
+        X_pred_ur_df.loc[X_pred_ur_df.groupby('reg_indx').get_group(r+1).index, 'pred_fire_freq']= 0
+
+    for ind in tqdm(np.hstack(pred_loc_arr)):
+        X_pred_ur_df.loc[ind, 'pred_fire_freq']+=1 
+
+    nan_ind_arr= X_pred_ur_df['Tmax'].isna()
+    X_pred_ur_df.loc[nan_ind_arr, 'pred_fire_freq']= np.nan
+
+    return mdn_freq_test_df, freq_loc_df, X_pred_ur_df
+
 def grid_ssf_size_func(mdn_model, stat_model, max_size_arr, sum_size_arr, pred_mon_flag= True, pred_mons= None, seas_flag= None, base_yr= 1984, fcast_yr= None, \
                         nsamps= 1000, loc_df= None, ml_freq_df= None, X_test_dat= None, seed= None):
     
