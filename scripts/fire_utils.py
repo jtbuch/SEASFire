@@ -533,30 +533,46 @@ def human_var_interp(var_name, sav_flag= False):
         return popdf_tot
 
 def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L3', l4indx= None, tscale= "yearly", savg= True, start_year= 1984, final_year= 2019, \
-                      burnarr_len= 0, seas_pred_flag= False, pred_mon_ind= None):
+                      burnarr_len= 0, seas_pred_flag= False, pred_mon_ind= None, fsize_flag= False):
     
-    # returns an array of climate predictor variable data at different temporal scales; (04/24/23) included 'seas_pred_flag' to create separate array for seasonal climate prediction
+    # returns an array of climate predictor variable data at different temporal scales; 
+    # (04/24/23) included 'seas_pred_flag' to create separate array for seasonal climate prediction
+    # (07/15/24) included 'fsize_flag' to account for the final year in the fire_size_df (but not fire_freq_df) prediction
     
     regname= {1: "ca_sierra", 2: "ca_north_coast", 3: "ca_cent_coast", 4: "ca_south_coast", 5: "pnw_mts", 6: "columbia_plateau", 7:"northern_rockies", \
           8: "middle_rockies", 9: "southern_rockies", 10: "am_semidesert", 11: "aznm_mts", 12: "im_semidesert", 13: "im_desert", 14: "northern_great_plains", \
           15: "high_plains", 16: "colorado_plateau", 17: "sw_tablelands", 18: "ch_desert", 19: "ca_total"}
+    
+    if fsize_flag:
+        dir_year= final_year + 1
+    else:
+        dir_year= final_year
+    if final_year <=2020:
+        clim_data_dir= "climate/primary/"
+        clim_daily_dir= "climate/from_daily/"
+        nsidc_dir= "nsidc/"
+    else:
+        clim_data_dir= "climate/%s/primary/"%(dir_year)
+        clim_daily_dir= "climate/%s/from_daily/"%(dir_year)
+        nsidc_dir= "nsidc/%s/"%(dir_year)
+
     if not seas_pred_flag:
-        pred_flabel_arr= {1: ["climate/primary/tmax.nc"], 2: ["climate/primary/es.nc", "climate/primary/ea.nc"], 3: ["climate/primary/prec.nc"], \
-                         4: ["climate/primary/prec.nc"], 5: ["climate/primary/ETo_co2.nc"], 6: ["landcover/nlcd/forest.nc"], 7: ["climate/primary/solar.nc"], \
-                         8: ["climate/from_daily/wind_max1.nc"], 9: ["topography/elev.nc"], 10: ["landcover/nlcd/grassland.nc"], 11: ["climate/primary/rh.nc"], 12: ["climate/primary/scPDSI.nc"], \
-                         13: ["climate/primary/cape.nc"], 14: ["landcover/nlcd/urban.nc"], 15: ["climate/from_daily/ffwi_max3.nc"], 16: ["climate/primary/tmin.nc"], \
-                         17: ["climate/from_daily/wind_max3.nc"], 18: ["population/campdist.nc"], 19: ["population/campnum.nc"], 20: ["population/roaddist.nc"], \
-                         21: ["climate/from_daily/vpd_max3.nc"], 22: ["climate/from_daily/vpd_max7.nc"], 23: ["climate/from_daily/tmax_max3.nc"], \
-                         24: ["climate/from_daily/tmax_max7.nc"], 25: ["climate/from_daily/tmin_max3.nc"], 26: ["climate/from_daily/tmin_max7.nc"], \
-                         27: ["climate/from_daily/ffwi_max7.nc"], 28: ["topography/slope.nc"], 29: ["topography/southness.nc"], 30: ["nsidc/swemean.nc"], 31: ["nsidc/swemax.nc"], \
-                         32: ["climate/primary/tmax.nc", "climate/primary/tmin.nc"], 33: ["landcover/biomass_aboveground.nc"], 34: ["climate/from_daily/rh_min3.nc"], 35: ["landcover/nlcd/shrub.nc"]} 
+        pred_flabel_arr= {1: [clim_data_dir + "tmax.nc"], 2: [clim_data_dir + "es.nc", clim_data_dir + "ea.nc"], 3: [clim_data_dir + "prec.nc"], \
+                         4: [clim_data_dir + "prec.nc"], 5: [clim_data_dir + "ETo_co2.nc"], 6: ["landcover/nlcd/forest.nc"], 7: [clim_data_dir + "solar.nc"], \
+                         8: [clim_daily_dir + "wind_max1.nc"], 9: ["topography/elev.nc"], 10: ["landcover/nlcd/grassland.nc"], 11: [clim_data_dir + "rh.nc"], 12: [clim_data_dir + "scPDSI.nc"], \
+                         13: [clim_data_dir + "cape.nc"], 14: ["landcover/nlcd/urban.nc"], 15: [clim_daily_dir + "ffwi_max3.nc"], 16: [clim_data_dir + "tmin.nc"], \
+                         17: [clim_daily_dir + "wind_max3.nc"], 18: ["population/campdist.nc"], 19: ["population/campnum.nc"], 20: ["population/roaddist.nc"], \
+                         21: [clim_daily_dir + "vpd_max3.nc"], 22: [clim_daily_dir + "vpd_max7.nc"], 23: [clim_daily_dir + "tmax_max3.nc"], \
+                         24: [clim_daily_dir + "tmax_max7.nc"], 25: [clim_daily_dir + "tmin_max3.nc"], 26: [clim_daily_dir + "tmin_max7.nc"], \
+                         27: [clim_daily_dir + "ffwi_max7.nc"], 28: ["topography/slope.nc"], 29: ["topography/southness.nc"], 30: [nsidc_dir + "swemean.nc"], 31: [nsidc_dir + "swemax.nc"], \
+                         32: [clim_data_dir + "tmax.nc", clim_data_dir + "tmin.nc"], 33: ["landcover/biomass_aboveground.nc"], 34: [clim_daily_dir + "rh_min3.nc"], 35: ["landcover/nlcd/shrub.nc"]} 
                          #11: ["landcover/fuel_winslow/study_regions/deadbiomass_litter.nc"], 12: ["landcover/fuel_winslow/study_regions/livebiomass_leaf.nc"], 13: ["landcover/fuel_winslow/study_regions/connectivity.nc"]37: ["population/silvis/PopDenOf10perkm_distance_interp.nc"], 38: ["population/silvis/house_density_interp.nc"], 39: ["lightning/strike_density_interp.nc"]
     else:
-        pred_flabel_arr= {1: ["climate/primary/tmax.nc"], 2: ["climate/primary/vpd.nc"], 3: ["climate/primary/prec.nc"], 4: ["climate/primary/solar.nc"], 5: ["climate/primary/wind.nc"], \
-                         6: ["climate/primary/rh.nc"], 7: ["climate/primary/cape.nc"], 8: ["climate/primary/ffwi.nc"], 9: ["climate/primary/tmin.nc"], 10: ["nsidc/swemean.nc"], \
-                         11: ["climate/primary/soilm_0_100cm.nc"], 12: ["climate/primary/scPDSI.nc"], 13: ["climate/from_daily/wind_max1.nc"], 14: ["climate/from_daily/wind_max3.nc"], \
-                         15: ["climate/from_daily/tmax_max3.nc"], 16: ["climate/from_daily/tmax_max7.nc"], 17: ["climate/from_daily/tmin_max3.nc"], 18: ["climate/from_daily/tmin_max7.nc"], \
-                         19: ["climate/from_daily/ffwi_max3.nc"], 20: ["climate/from_daily/ffwi_max7.nc"], 21: ["climate/from_daily/vpd_max3.nc"], 22: ["climate/from_daily/vpd_max7.nc"], \
+        pred_flabel_arr= {1: [clim_data_dir + "tmax.nc"], 2: [clim_data_dir + "vpd.nc"], 3: [clim_data_dir + "prec.nc"], 4: [clim_data_dir + "solar.nc"], 5: [clim_data_dir + "wind.nc"], \
+                         6: [clim_data_dir + "rh.nc"], 7: [clim_data_dir + "cape.nc"], 8: [clim_data_dir + "ffwi.nc"], 9: [clim_data_dir + "tmin.nc"], 10: [nsidc_dir + "swemean.nc"], \
+                         11: [clim_data_dir + "soilm_0_100cm.nc"], 12: [clim_data_dir + "scPDSI.nc"], 13: [clim_daily_dir + "wind_max1.nc"], 14: [clim_daily_dir + "wind_max3.nc"], \
+                         15: [clim_daily_dir + "tmax_max3.nc"], 16: [clim_daily_dir + "tmax_max7.nc"], 17: [clim_daily_dir + "tmin_max3.nc"], 18: [clim_daily_dir + "tmin_max7.nc"], \
+                         19: [clim_daily_dir + "ffwi_max3.nc"], 20: [clim_daily_dir + "ffwi_max7.nc"], 21: [clim_daily_dir + "vpd_max3.nc"], 22: [clim_daily_dir + "vpd_max7.nc"], \
                          23: ["topography/southness.nc"], 24: ["topography/elev.nc"], 25: ["landcover/biomass_aboveground.nc"]}
     pred_season_arr= {1: "warm", 2: "antecedent_lag1", 3: "annual", 4: "static", 5: "moving_average_3mo", 6: "moving_average_4mo", 7: "moving_average_2mo", \
                       8: "antecedent_lag2", 9: "antecedent_avg"} 
@@ -576,7 +592,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
         else:
             pred_data= bailey_ecoprovince_mask(pred_file, region= regname[regindx], lflag= lflag, l4indx= l4indx);
     
-    if final_year != 2023:
+    if final_year != 2024:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind
@@ -646,7 +662,10 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
         
         elif pred_season == "antecedent_lag2":
             fire_tim_ind_ant= fire_tim_ind_func(pred_file, start_year, final_year, antecedent= True)
-            seas_indx_1, seas_indx_2= tindx_func(startmon= 0, duration= 12, tim_size= tot_months + (12 - pred_mon_ind))
+            if pred_mon_ind == None:
+                seas_indx_1, seas_indx_2= tindx_func(startmon= 0, duration= 12, tim_size= tot_months)
+            else:
+                seas_indx_1, seas_indx_2= tindx_func(startmon= 0, duration= 12, tim_size= tot_months + (12 - pred_mon_ind))
             if savg:
                 pred_data= np.asarray([np.mean(pred_data[fire_tim_ind_ant][seas_indx_1[i]:seas_indx_2[i]], axis=(1, 2)).values for i in range(len(seas_indx_1))])
                 return np.repeat(np.mean(pred_data, axis= 1), 12)[0:tot_months] # assumption: antecedent precipitation is the same for all fire months
@@ -656,7 +675,10 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
         
         elif pred_season == "antecedent_lag1":
             fire_tim_ind_ant= fire_tim_ind_func(pred_file, start_year, final_year, antecedent= True)
-            seas_indx_1, seas_indx_2= tindx_func(startmon= 12, duration= 12, tim_size= tot_months + (12 - pred_mon_ind))
+            if pred_mon_ind == None:
+                seas_indx_1, seas_indx_2= tindx_func(startmon= 12, duration= 12, tim_size= tot_months)
+            else:
+                seas_indx_1, seas_indx_2= tindx_func(startmon= 12, duration= 12, tim_size= tot_months + (12 - pred_mon_ind))
             if savg:
                 pred_data= np.asarray([np.mean(pred_data[fire_tim_ind_ant][seas_indx_1[i]:seas_indx_2[i]], axis=(1, 2)).values for i in range(len(seas_indx_1))])
                 return np.repeat(np.mean(pred_data, axis= 1), 12)[0:tot_months] # assumption: antecedent precipitation is the same for all fire months
@@ -947,7 +969,7 @@ def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_y
     # function to allocate individual fires from the firelist.txt file to a raster grid of varying resolutions. This serves two roles: 1) allows the predictions of fire probability for individual grid cells;
     # 2) enables the calculation of a (weighted) average for climate variables for each fire.
     
-    if final_year != 2023:
+    if final_year != 2024:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind
@@ -963,8 +985,8 @@ def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_y
     firepts= gpd.GeoSeries(firegdf['geometry'].buffer(np.sqrt(firegdf['final_area_ha']*1e4/np.pi))) #currently buffer is a circle with radius = sqrt(A/pi) [in m] with origin as the provided fire location
     firepts_gdf= gpd.GeoDataFrame({'geometry': firepts, 'fire_indx': firegdf.index.to_numpy(), \
                                'fire_month': (firegdf['final_month'] - 1) + (firegdf['final_year'] - 1984)*12, \
-                               'fire_size': firegdf['final_area_ha']*1e4, 'reg_indx': firegdf['reg_indx'], \
-                               'L4_indx': firegdf['L4_indx']})
+                               'fire_size': firegdf['final_area_ha']*1e4, 'reg_indx': firegdf['reg_indx']})
+                               # , \ 'L4_indx': firegdf['L4_indx']})
                                
     
     print("Created a GeoDataFrame of all fires");
@@ -1029,7 +1051,7 @@ def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_y
                 gdf_var= pred_var
 
             clim_var_data= clim_pred_var(pred_file_indx= pred_findx_arr[pred_var], pred_seas_indx= pred_sindx_arr[seas_var], tscale= "monthly", savg= False, \
-                                         start_year= start_year, final_year= final_year)
+                                         start_year= start_year, final_year= final_year, fsize_flag= True)
             if res == '24km':
                 if seas_var == 'static':
                     clim_var_arr= np.nanmean(sliding_window_view(clim_var_data[:-1 , :], (2, 2), axis= (0, 1)), axis= (2, 3))[::2, ::2]
@@ -1102,7 +1124,7 @@ def init_eff_clim_fire_df(firegdf, start_month= 372, tot_test_months= 60, hyp_fl
 def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None, seas_pred_flag= False, pred_mon_ind= None):
     
     # Initializes a dataframe with climate and fire frequency information at each grid point; startmon/totmonths is for test data!
-    # seas_pred_flag = True if the climate predictors are for subseasonal prediction; 
+    # seas_pred_flag = True if the climate predictors are for statistical subseasonal prediction model; 
     # pred_mon_ind is the index of the month for which the subseasonal prediction has been initiated;
     
     if not seas_pred_flag:
@@ -1129,7 +1151,7 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
     pred_sindx_arr= {"warm": 1, "antecedent_lag1": 2, "annual": 3, "static": 4, "moving_average_3mo": 5, "moving_average_4mo": 6, "moving_average_2mo": 7, "antecedent_lag2": 8, "antecedent_avg": 9} 
     
     clim_fire_df= pd.DataFrame([])
-    if final_year != 2023:
+    if final_year != 2024:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind
@@ -1231,13 +1253,13 @@ def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, fin
     #creates a dataframe with climate variables and fire frequencies at monthly and annual resolutions
     
     clim_df= init_clim_fire_grid(res, tscale, start_year, final_year, scaled, startmon, totmonths, seas_arr= seas_arr, pred_mon_ind= pred_mon_ind) #time: ~ 8 mins
-    if final_year != 2023:
+    if final_year != 2024:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind
     
     if tscale == 'monthly':
-        clim_fire_grid_df= xarray.open_dataarray(data_dir + pred_input_path + 'climate/primary/tmax.nc').sel(time=slice('%s'%str(start_year), '%s'%str(final_year))).to_dataframe(name='Tmax').reset_index() #.dropna()
+        clim_fire_grid_df= xarray.open_dataarray(data_dir + pred_input_path + 'climate/%s/primary/tmax.nc'%(final_year)).sel(time=slice('%s'%str(start_year), '%s'%str(final_year))).to_dataframe(name='Tmax').reset_index() #.dropna()
         clim_fire_grid_gdf= gpd.GeoDataFrame(clim_fire_grid_df.Tmax, crs= 'EPSG:5070', geometry= gpd.points_from_xy(clim_fire_grid_df.X, clim_fire_grid_df.Y))
         reg_indx_arr= update_reg_indx(clim_fire_grid_gdf) #time: ~ 1.5 hrs
         clim_fire_grid_df['reg_indx']= reg_indx_arr
@@ -1254,10 +1276,10 @@ def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, fin
         coord_df= tmax_df[['X', 'Y', 'month']]
         coord_df['fire_freq']= np.zeros_like(len(coord_df), dtype= int)
         if final_year < 2020:
-            fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_data.h5').append(pd.read_hdf('../data/clim_fire_size_12km_test_data.h5'), ignore_index= True)
+            fires_df= pd.concat([pd.read_hdf('../data/clim_fire_size_12km_train_data.h5'), pd.read_hdf('../data/clim_fire_size_12km_test_data.h5')], ignore_index= True)
         else:
-            fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_w2022_data.h5').append(pd.read_hdf('../data/clim_fire_size_12km_test_w2022_data.h5'),\
-                                                                                                                                               ignore_index= True)
+            fires_df= pd.concat([pd.read_hdf('../data/clim_fire_size_12km_train_w%s_data.h5'%(final_year-1)), \
+                                                    pd.read_hdf('../data/clim_fire_size_12km_test_w%s_data.h5'%(final_year-1))], ignore_index= True)
         #if threshold != None:
         #    fires_df= fires_df[fires_df['fire_size']/1e6 > 4].reset_index().drop(columns= ['index'])
             
@@ -1284,7 +1306,7 @@ def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, fin
 
         coord_df= tmax_df[['X', 'Y']]
         coord_df['fire_freq']= np.zeros_like(len(coord_df), dtype= int)
-        fires_df= pd.read_hdf('../data/clim_fire_size_12km_train_data.h5').append(pd.read_hdf('../data/clim_fire_size_12km_test_data.h5'), ignore_index= True)
+        fires_df= pd.concat([pd.read_hdf('../data/clim_fire_size_12km_train_data.h5'), pd.read_hdf('../data/clim_fire_size_12km_test_data.h5')], ignore_index= True)
         
         if tscale == 'longterm':
             for ind in tqdm(range(len(fires_df))):
