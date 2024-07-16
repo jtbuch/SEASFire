@@ -832,7 +832,7 @@ def fire_freq_pred_func(target_yr, firemon_pred_flag= 'dynamical_forecasts', ens
         clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w2022_rescaled_data.h5')
         sys_no= None
     else:
-        clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w2023_rescaled_data.h5')
+        clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w%s_rescaled_data.h5'%target_yr)
         sys_no= 51
     clim_df.loc[clim_df[clim_df.fire_freq > 1].index, 'fire_freq']= np.ones(len(clim_df[clim_df.fire_freq > 1].index), dtype= np.int64)
 
@@ -1166,11 +1166,11 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
     
     ## Loading observed and forecast climate predictors
     
-    if target_yr != 2023:
+    if target_yr < 2023:
         clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w2022_rescaled_data.h5')
         sys_no= None
     else:
-        clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w2023_rescaled_data.h5')
+        clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w%s_rescaled_data.h5'%target_yr)
         sys_no= 51
     clim_df.loc[clim_df[clim_df.fire_freq > 1].index, 'fire_freq']= np.ones(len(clim_df[clim_df.fire_freq > 1].index), dtype= np.int64)
     pred_drop_cols= ['SWE_mean', 'SWE_max', 'AvgSWE_3mo']
@@ -1241,7 +1241,7 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
     
     for ens_no in tqdm(range(tot_ens_mems)):
         if firemon_pred_flag == 'statistical_forecasts':
-            if target_yr != 2023:
+            if target_yr < 2023:
                 fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
             else:
                 fire_freq_df= pd.DataFrame({'fire_freq': np.zeros(len(tmax_xr[0].values.flatten())*len(pred_mon_arr), dtype= np.int64)})
@@ -1272,11 +1272,11 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
                     "lon": (["lon"], np.arange(-128, -101, 0.125), {"units": "degrees_west"}),
                 }
                 )
-            tmax_xr= xarray.open_dataarray('../data/12km/climate/primary/tmax.nc')
+            tmax_xr= xarray.open_dataarray('../data/12km/climate/%s/primary/tmax.nc'%target_yr)
             x_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[0], dims=('Y','X'))
             y_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[1], dims=('Y','X'))
 
-            if target_yr != 2023:
+            if target_yr < 2023:
                 fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
             else:
                 fire_freq_df= pd.DataFrame({'fire_freq': np.zeros(len(tmax_xr[0].values.flatten())*len(pred_mon_arr), dtype= np.int64)})
@@ -1342,8 +1342,8 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
             mdn_freq_test_df.to_hdf('../sav_files/fire_freq_pred_dfs/mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%target_yr + '_%s.h5'%firemon_pred_flag, key= 'df', mode= 'w')
             freq_loc_df.to_hdf('../sav_files/fire_freq_pred_dfs/freq_loc_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%target_yr + '_%s.h5'%firemon_pred_flag, key= 'df', mode= 'w')
         else:
-            mdn_freq_test_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s'%firemon_pred_flag + '/mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
-            freq_loc_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s'%firemon_pred_flag + '/freq_loc_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
+            mdn_freq_test_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + 'mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
+            freq_loc_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + 'freq_loc_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
         
         for freqlabel in ['pred_mean_freq', 'pred_high_2sig']: # 'pred_mean_freq', 'pred_high_2sig', 'pred_low_2sig'
             pred_loc_arr= loc_ind_ssf_func(loc_df= freq_loc_df, ml_freq_df= mdn_freq_test_df, X_test_dat= X_pred_test_df, pred_mon_flag= True, pred_mons= pred_mon_arr, freqlabel= freqlabel)
@@ -1380,5 +1380,5 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
                     reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
                                                                                                                     + '_%s'%sizelabel + '_%s.h5'%target_yr, key= 'df', mode= 'w')
                 else:
-                    reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/' + '%s'%firemon_pred_flag + '/pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
+                    reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + 'pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
                                                                                                                 + '_%s'%sizelabel + '_%d'%(ens_no) + '_%s.h5'%target_yr, key= 'df', mode= 'w')
