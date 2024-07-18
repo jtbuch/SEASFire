@@ -547,7 +547,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
         dir_year= final_year + 1
     else:
         dir_year= final_year
-    if final_year <=2020:
+    if final_year <= 2020:
         clim_data_dir= "climate/primary/"
         clim_daily_dir= "climate/from_daily/"
         nsidc_dir= "nsidc/"
@@ -592,7 +592,7 @@ def clim_pred_var(pred_file_indx, pred_seas_indx= None, regindx= None, lflag= 'L
         else:
             pred_data= bailey_ecoprovince_mask(pred_file, region= regname[regindx], lflag= lflag, l4indx= l4indx);
     
-    if final_year != 2024:
+    if final_year < 2024:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind
@@ -969,7 +969,7 @@ def init_fire_alloc_gdf(firedat, firegdf, res= '24km', start_year= 1984, final_y
     # function to allocate individual fires from the firelist.txt file to a raster grid of varying resolutions. This serves two roles: 1) allows the predictions of fire probability for individual grid cells;
     # 2) enables the calculation of a (weighted) average for climate variables for each fire.
     
-    if final_year != 2024:
+    if final_year < 2024:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind
@@ -1121,7 +1121,7 @@ def init_eff_clim_fire_df(firegdf, start_month= 372, tot_test_months= 60, hyp_fl
     
     return newdf
 
-def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None, seas_pred_flag= False, pred_mon_ind= None):
+def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None, seas_pred_flag= False, pred_mon_ind= None, fsize_flag= None):
     
     # Initializes a dataframe with climate and fire frequency information at each grid point; startmon/totmonths is for test data!
     # seas_pred_flag = True if the climate predictors are for statistical subseasonal prediction model; 
@@ -1151,7 +1151,7 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
     pred_sindx_arr= {"warm": 1, "antecedent_lag1": 2, "annual": 3, "static": 4, "moving_average_3mo": 5, "moving_average_4mo": 6, "moving_average_2mo": 7, "antecedent_lag2": 8, "antecedent_avg": 9} 
     
     clim_fire_df= pd.DataFrame([])
-    if final_year < 2023:
+    if final_year < 2024:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind
@@ -1166,12 +1166,11 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
                 gdf_var= pred_var
 
             clim_var_data= clim_pred_var(pred_file_indx= pred_findx_arr[pred_var], pred_seas_indx= pred_sindx_arr[seas_var], tscale= "monthly", savg= False, \
-                                                                                                                start_year= start_year, final_year= final_year, seas_pred_flag= False, pred_mon_ind= pred_mon_ind)
+                                                                    start_year= start_year, final_year= final_year, seas_pred_flag= False, pred_mon_ind= pred_mon_ind, fsize_flag= fsize_flag)
         else:
             gdf_var= pred_var
-
             clim_var_data= clim_pred_var(pred_file_indx= i+1, pred_seas_indx= pred_sindx_arr[seas_var], tscale= "monthly", savg= False, \
-                                                                                                                start_year= start_year, final_year= final_year, seas_pred_flag= True, pred_mon_ind= pred_mon_ind)
+                                                                    start_year= start_year, final_year= final_year, seas_pred_flag= True, pred_mon_ind= pred_mon_ind)
         if res == '24km':
             if seas_var == 'static':
                 clim_var_arr= np.nanmean(sliding_window_view(clim_var_data[:-1 , :], (2, 2), axis= (0, 1)), axis= (2, 3))[::2, ::2]
@@ -1247,25 +1246,25 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
     
     return clim_fire_df
 
-def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None, pred_mon_ind= None):
+def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None, pred_mon_ind= None, fsize_flag= None):
     
     # threshold= None --> optional keyword argument for fire size
     #creates a dataframe with climate variables and fire frequencies at monthly and annual resolutions
     
-    clim_df= init_clim_fire_grid(res, tscale, start_year, final_year, scaled, startmon, totmonths, seas_arr= seas_arr, pred_mon_ind= pred_mon_ind) #time: ~ 8 mins
-    if final_year != 2024:
+    clim_df= init_clim_fire_grid(res, tscale, start_year, final_year, scaled, startmon, totmonths, seas_arr= seas_arr, pred_mon_ind= pred_mon_ind, fsize_flag= fsize_flag) #time: ~ 8 mins
+    if final_year < 2024:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind
     
     if tscale == 'monthly':
-        clim_fire_grid_df= xarray.open_dataarray(data_dir + pred_input_path + 'climate/%s/primary/tmax.nc'%(final_year)).sel(time=slice('%s'%str(start_year), '%s'%str(final_year))).to_dataframe(name='Tmax').reset_index() #.dropna()
+        clim_fire_grid_df= xarray.open_dataarray(data_dir + pred_input_path + 'climate/%s/primary/tmax.nc'%(final_year + int(fsize_flag))).sel(time=slice('%s'%str(start_year), '%s'%str(final_year))).to_dataframe(name='Tmax').reset_index() #.dropna()
         clim_fire_grid_gdf= gpd.GeoDataFrame(clim_fire_grid_df.Tmax, crs= 'EPSG:5070', geometry= gpd.points_from_xy(clim_fire_grid_df.X, clim_fire_grid_df.Y))
         reg_indx_arr= update_reg_indx(clim_fire_grid_gdf) #time: ~ 1.5 hrs
         clim_fire_grid_df['reg_indx']= reg_indx_arr
 
         tmax_arr= xarray.DataArray(data= clim_pred_var(pred_file_indx= 1, pred_seas_indx= 1, tscale= "monthly", savg= False, start_year= start_year, \
-                                                       final_year= final_year, seas_pred_flag= False, pred_mon_ind= pred_mon_ind)[0:tot_months],
+                                                       final_year= final_year, seas_pred_flag= False, pred_mon_ind= pred_mon_ind, fsize_flag= fsize_flag)[0:tot_months],
             dims=["month", "Y", "X"],
             coords=dict(
                 X=(["X"], np.linspace(0, 154, 155, dtype= np.int64)),
