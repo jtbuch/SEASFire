@@ -1151,7 +1151,7 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
     pred_sindx_arr= {"warm": 1, "antecedent_lag1": 2, "annual": 3, "static": 4, "moving_average_3mo": 5, "moving_average_4mo": 6, "moving_average_2mo": 7, "antecedent_lag2": 8, "antecedent_avg": 9} 
     
     clim_fire_df= pd.DataFrame([])
-    if final_year != 2024:
+    if final_year < 2023:
         tot_months= (final_year + 1 - start_year)*12
     else:
         tot_months= (final_year - start_year)*12 + pred_mon_ind

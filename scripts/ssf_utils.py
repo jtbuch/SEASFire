@@ -345,7 +345,7 @@ def fire_pred_df_func(clim_df, target_yr, pred_mon_arr, pred_var_arr, firemon_pr
     freq_flag: flag for returning dataframe of fire predictors for single prediction or ensemble plots
     '''
     
-    tmax_xr= xarray.open_dataarray('../data/12km/climate/2023/primary/tmax.nc')
+    tmax_xr= xarray.open_dataarray('../data/12km/climate/%s/primary/tmax.nc'%target_yr)
 
     if firemon_pred_flag == 'statistical_forecasts':
         if target_yr != 2023:
@@ -403,7 +403,7 @@ def fire_pred_df_func(clim_df, target_yr, pred_mon_arr, pred_var_arr, firemon_pr
         x_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[0], dims=('Y','X'))
         y_fire_grid= xr.DataArray(coord_transform(tmax_xr.X.values, tmax_xr.Y.values, "epsg:5070", "epsg:4326")[1], dims=('Y','X'))
 
-        if target_yr != 2023:
+        if target_yr < 2023:
             fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
         else:
             fire_freq_df= pd.DataFrame({'fire_freq': np.zeros(len(tmax_xr[0].values.flatten())*len(pred_mon_arr), dtype= np.int64)})
@@ -828,7 +828,7 @@ def fire_freq_pred_func(target_yr, firemon_pred_flag= 'dynamical_forecasts', ens
     freqlabel: 'pred_mean_freq' or 'pred_high_2sig' or 'pred_low_2sig'
     """
 
-    if target_yr != 2023:
+    if target_yr < 2023:
         clim_df= pd.read_hdf('../data/clim_fire_freq_12km_w2022_rescaled_data.h5')
         sys_no= None
     else:
@@ -1239,7 +1239,7 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
             climdf= pd.concat([clim_xarr.to_dataframe().reset_index(), climdf[['Elev', 'mei', 'nino34', 'rmm1', 'rmm2']]], axis= 1) #'Southness',
         climdf.time= (climdf.time.dt.year*12 + climdf.time.dt.month) - (1952*12 + 1)
     
-    for ens_no in tqdm(range(tot_ens_mems)):
+    for ens_no in tqdm(range(tot_ens_mems)): 
         if firemon_pred_flag == 'statistical_forecasts':
             if target_yr < 2023:
                 fire_freq_df= clim_df[clim_df.month.isin(pred_mon_arr)]['fire_freq'].reset_index(drop= True)
