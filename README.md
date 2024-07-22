@@ -8,9 +8,13 @@ We consider two initialization modes for constructing the input predictors for t
 
 ![plot](./plots/fcast_initmodes.jpg)
 
-The architecture of our seasonal fire forecasting system allow us to generate fire probability maps in each 12km x 12km grid cell across the study region. A preliminary forecast of fire probability for August and September 2024 using observations until May 2024 is shown below,
+The architecture of our seasonal fire forecasting system allow us to generate fire probability maps in each 12km x 12km grid cell across the study region. Preliminary forecasts of fire probability for August and September 2024 using observations until May 2024 are shown below,
 
-![plot](./plots/2024/pred_fire_prob_08_07_23_654_ens_mean_as_2024.png)
+![plot](./plots/2024/pred_fire_prob_08_07_23_654_ens_mean_aug_2024.png)
+
+![plot](./plots/2024/pred_fire_prob_08_07_23_654_ens_mean_sep_2024.png)
+
+where $p_{\rm fire}/p_{\rm baseline}$ greater than (less than) 1, represents above (below) normal fire probability.
 
 Future iterations will extend this framework to other fire response variables such as fire intensity and biomass emissions.
 
