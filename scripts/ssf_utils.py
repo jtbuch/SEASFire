@@ -526,7 +526,7 @@ def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= No
     else:
         return pred_prob_xarr
     
-def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, fmon= 5, fire_df= None, firemon_pred_flag= 'observations', ens_no= None, pred_fire_df= None):
+def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, fmon= 5, fire_df= None, firemon_pred_flag= 'observations', ens_no= None, pred_fire_df= None):
     """
     Function to rescale predicted fire probability with climatological baseline fire probability and observed number of fires
 
@@ -543,19 +543,28 @@ def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, fmon= 5, f
         pred_prob_xarr= xarray.open_dataarray('../sav_files/ssf_pred_files/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'obs_%s.nc'%plot_yr)
         n_fires_yr= len(fire_df[fire_df['fire_month'] == (plot_yr - 1984)*12 + fmon])
     elif firemon_pred_flag == 'dynamical_forecasts':
-        pred_prob_xarr= xarray.open_dataarray('../sav_files/ssf_pred_files/dynamical_forecasts/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%plot_yr)
-        n_fires_yr= pred_fire_df[pred_fire_df.month == (plot_yr - 1984)*12 + fmon]['pred_mean_freq'].sum()
+        pred_prob_xarr= xarray.open_dataarray('../sav_files/ssf_pred_files/dynamical_forecasts/%s'%plot_yr + '/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%plot_yr)
+        pred_fire_df= pd.read_hdf('../sav_files/fire_freq_pred_dfs/dynamical_forecasts/%s'%plot_yr + '/mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%ens_no + '_%d.h5'%plot_yr)
+        if fmon == 9:
+            n_fires_yr= 11
+        else:
+            n_fires_yr= pred_fire_df[pred_fire_df.month == (plot_yr - 1984)*12 + fmon]['pred_mean_freq'].sum()
     else:
         pred_prob_xarr= xarray.open_dataarray('../sav_files/ssf_pred_files/statistical_forecasts/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'sf_%d'%ens_no + '_%s.nc'%plot_yr)
         n_fires_yr= pred_fire_df[pred_fire_df.month == (plot_yr - 1984)*12 + fmon]['pred_mean_freq'].sum()
 
-    baseline_arr= np.arange(209, 426, 12)
-    n_fires_baseline= len(fire_df[fire_df['fire_month'].isin(baseline_arr + (fmon - 5))])/20
+    #baseline_arr= np.arange(209, 426, 12)
+    #n_fires_baseline= len(fire_df[fire_df['fire_month'].isin(baseline_arr + (fmon - 5))])/20
+    baseline_arr= baseline_mon_arr_func(start_yr= 2001, end_yr= 2019, mindx= smon).values
+    n_fires_baseline= len(fire_df[fire_df['fire_month'].isin(baseline_arr + (fmon - smon))])/20
 
     pred_prob_baseline= xarray.open_dataarray('../sav_files/ssf_pred_files/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'obs_baseline.nc')
-    pred_prob_xarr_baseline= pred_prob_baseline[pred_prob_baseline.time.isin(baseline_mon_arr_func(start_yr= 2001, end_yr= 2019, mindx= (fmon + 1)).values), :, :].mean(dim= 'month')
+    #pred_prob_xarr_baseline= pred_prob_baseline[pred_prob_baseline.time.isin(baseline_mon_arr_func(start_yr= 2001, end_yr= 2019, mindx= (fmon + 1)).values), :, :].mean(dim= 'month')
     #fmon + 1 because months start from 1 in baseline formulation    
-    return 10**(np.log10(pred_prob_xarr[(fmon - 5), :, :]) - np.log10(pred_prob_xarr_baseline) - np.log10(n_fires_baseline/n_fires_yr))
+    #return 10**(np.log10(pred_prob_xarr[(fmon - 5), :, :]) - np.log10(pred_prob_xarr_baseline) - np.log10(n_fires_baseline/n_fires_yr))
+
+    pred_prob_xarr_baseline= pred_prob_baseline[pred_prob_baseline.time.isin(baseline_mon_arr_func(start_yr= 2001, end_yr= 2019, mindx= fmon).values), :, :].mean(dim= 'month')
+    return 10**(np.log10(pred_prob_xarr[(fmon - smon), :, :]) - np.log10(pred_prob_xarr_baseline) - np.log10(n_fires_baseline/n_fires_yr))
 
 def ens_mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, fmon= 5, fire_df= None, firemon_pred_flag= 'dynamical_forecasts', statistic= 'mean'):
     """
