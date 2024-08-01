@@ -1249,6 +1249,7 @@ def init_clim_fire_grid(res= '12km', tscale= 'monthly', start_year= 1984, final_
 def init_clim_fire_freq_df(res= '12km', tscale= 'monthly', start_year= 1984, final_year= 2019, scaled= False, startmon= None, totmonths= None, seas_arr= None, pred_mon_ind= None, fsize_flag= None):
     
     # threshold= None --> optional keyword argument for fire size
+    # fsize_flag= True --> includes full year of data for fire_size_df
     #creates a dataframe with climate variables and fire frequencies at monthly and annual resolutions
     
     clim_df= init_clim_fire_grid(res, tscale, start_year, final_year, scaled, startmon, totmonths, seas_arr= seas_arr, pred_mon_ind= pred_mon_ind, fsize_flag= fsize_flag) #time: ~ 8 mins
