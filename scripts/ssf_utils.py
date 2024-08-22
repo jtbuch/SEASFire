@@ -202,27 +202,33 @@ def seas5_monthly_anomaly_func(pred_var, system= None, fyear= 2021, init_month= 
     dsout: output grid for regridding
     anom_type: type of anomaly (raw or standardized)
     """
+
+    # Determine which season the forecast is for
+    if init_month > 6:
+        predmonflag= 'jj'
+    else:
+        predmonflag= 'amj'
     
     if pred_var == 'VPD':
         if system == None:
-            ds_hindcast_d2m= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_1993-2016_amj_hindcast_monthly_Tdew.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            ds_hindcast_tmax= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_1993-2016_amj_hindcast_monthly_Tmax.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            ds_hindcast_tmin= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_1993-2016_amj_hindcast_monthly_Tmin.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            seas5_forecast_d2m= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_%s'%fyear + '_amj_forecast_monthly_Tdew.grib', engine='cfgrib', 
+            ds_hindcast_d2m= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_1993-2016_{predmonflag}_hindcast_monthly_Tdew.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
+            ds_hindcast_tmax= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_1993-2016_{predmonflag}_hindcast_monthly_Tmax.grib'%predmonflag, engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
+            ds_hindcast_tmin= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_1993-2016_{predmonflag}_hindcast_monthly_Tmin.grib'%predmonflag, engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
+            seas5_forecast_d2m= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_{fyear}_{predmonflag}_forecast_monthly_Tdew.grib', engine='cfgrib', 
                                         backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            seas5_forecast_tmax= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_%s'%fyear + '_amj_forecast_monthly_Tmax.grib', engine='cfgrib', 
+            seas5_forecast_tmax= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_{fyear}_{predmonflag}_forecast_monthly_Tmax.grib'%predmonflag, engine='cfgrib', 
                                         backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            seas5_forecast_tmin= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_%s'%fyear + '_amj_forecast_monthly_Tmin.grib', engine='cfgrib', 
+            seas5_forecast_tmin= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_{fyear}_{predmonflag}_forecast_monthly_Tmin.grib'%predmonflag, engine='cfgrib', 
                                         backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
         else:
-            ds_hindcast_d2m= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_1993-2016_amj_hindcast_monthly_Tdew.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            ds_hindcast_tmax= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_1993-2016_amj_hindcast_monthly_Tmax.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            ds_hindcast_tmin= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_1993-2016_amj_hindcast_monthly_Tmin.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            seas5_forecast_d2m= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_%s'%fyear + '_amj_forecast_monthly_Tdew.grib', engine='cfgrib', 
+            ds_hindcast_d2m= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_1993-2016_{predmonflag}_hindcast_monthly_Tdew.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
+            ds_hindcast_tmax= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_1993-2016_{predmonflag}_hindcast_monthly_Tmax.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
+            ds_hindcast_tmin= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_1993-2016_{predmonflag}_hindcast_monthly_Tmin.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
+            seas5_forecast_d2m= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_{fyear}_{predmonflag}_forecast_monthly_Tdew.grib', engine='cfgrib', 
                                         backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            seas5_forecast_tmax= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_%s'%fyear + '_amj_forecast_monthly_Tmax.grib', engine='cfgrib', 
+            seas5_forecast_tmax= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_{fyear}_{predmonflag}_forecast_monthly_Tmax.grib', engine='cfgrib', 
                                         backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            seas5_forecast_tmin= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_%s'%fyear + '_amj_forecast_monthly_Tmin.grib', engine='cfgrib', 
+            seas5_forecast_tmin= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_{fyear}_{predmonflag}_forecast_monthly_Tmin.grib', engine='cfgrib', 
                                         backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
 
         
@@ -265,12 +271,12 @@ def seas5_monthly_anomaly_func(pred_var, system= None, fyear= 2021, init_month= 
         elif pred_var == 'Tmin':
             pred_var_name= 'mn2t24' #convert into dictionary
         if system == None:
-            ds_hindcast= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_1993-2016_amj_hindcast_monthly_%s.grib'%pred_var, engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            seas5_forecast = xr.open_dataset(f'{DATADIR}/ecmwf_seas5_%s'%fyear + '_amj_forecast_monthly_%s.grib'%pred_var, engine='cfgrib', 
+            ds_hindcast= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_1993-2016_{predmonflag}_hindcast_monthly_{pred_var}.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
+            seas5_forecast = xr.open_dataset(f'{DATADIR}/ecmwf_seas5_{fyear}_{predmonflag}forecast_monthly_{pred_var}.grib', engine='cfgrib', 
                                         backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
         else:
-            ds_hindcast= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_1993-2016_amj_hindcast_monthly_%s.grib'%pred_var, engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
-            seas5_forecast = xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_%s'%fyear + '_amj_forecast_monthly_%s.grib'%pred_var, engine='cfgrib', 
+            ds_hindcast= xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_1993-2016_{predmonflag}_hindcast_monthly_{pred_var}.grib', engine='cfgrib', backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
+            seas5_forecast = xr.open_dataset(f'{DATADIR}/ecmwf_seas5_51_{fyear}_{predmonflag}_forecast_monthly_{pred_var}.grib', engine='cfgrib', 
                                         backend_kwargs=dict(time_dims=('forecastMonth', 'time')))
         pred_var_hindcast= ds_hindcast[pred_var_name]
         pred_var_hindcast_mean= pred_var_hindcast.groupby('time.month')[init_month].mean(['number', 'time'])
@@ -477,7 +483,7 @@ def fire_pred_df_func(clim_df, target_yr, pred_mon_arr, pred_var_arr, firemon_pr
     elif freq_flag == 'prediction':
         return X_pred_ur_df, X_pred_test_df
         
-def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= None, pred_mon_arr= None, sav_flag= False, target_year= None, firemon_pred_flag= 'observations', ens_no= None):
+def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= None, pred_mon_arr= None, fcast_type= None, sav_flag= False, target_year= None, firemon_pred_flag= 'observations', ens_no= None):
     
     """ 
     Function to predict fire probability for a given month
@@ -519,7 +525,8 @@ def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= No
         if firemon_pred_flag == 'observations':
             pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'obs_%s.nc'%target_year)
         elif firemon_pred_flag == 'dynamical_forecasts':
-            pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/dynamical_forecasts/%s'%target_year + '/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%target_year)
+            pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/dynamical_forecasts/' + '%s/'%target_year + '%s/'%fcast_type + 'pred_prob_xarr_%s'%freq_id + \
+                                                                                                                    '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%target_year)
         else:
             pred_prob_xarr.to_netcdf('../sav_files/ssf_pred_files/statistical_forecasts/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'sf_%d'%ens_no + '_%s.nc'%target_year)
         return print('Saved fire probability xarray for %s'%target_year)
@@ -1158,7 +1165,7 @@ def ens_stat_forecast_func(climdf, pred_var, target_yr, samp_flag= True, debug= 
         return xarr_pred_loc_tyear, xarr_pred_scale_tyear
 
 
-def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_flag= 'dynamical_forecasts', fcast_type= 'dual_init', \
+def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_flag= 'dynamical_forecasts', fcast_type= 'mjjas', \
                                                     pred_var_arr= ['Tmax', 'Prec', 'VPD', 'Tmin'], freq_id= '08_07_23', seed= 654, size_id= '08_21_23', debug= False):
     """
     Function to generate SSF fire frequency and size forecasts for all members of a dynamical or statistical forecast ensemble
@@ -1166,7 +1173,7 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
     tot_ens_mems: total number of ensemble members
     target_yr: target year for which forecasts are generated
     firemon_pred_flag: flag to indicate whether the forecasts are generated from dynamical forecasts ('dynamical_forecasts') or statistical forecasts ('statistical_forecasts')
-    fcast_type: flag to indicate whether the forecasts are generated from a single initialization ('single_init') or dual initialization ('dual_init') forecast ensemble
+    fcast_type: flag to indicate whether the forecasts are generated for early summer ('mjjas') or through fall ('jaso')
     pred_var_arr: list of climate predictors used to generate the forecasts
     freq_id: identifier for the fire frequency model
     seed: seed for the fire frequency model
@@ -1185,14 +1192,14 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
     pred_drop_cols= ['SWE_mean', 'SWE_max', 'AvgSWE_3mo']
     n_features= 43 - len(pred_drop_cols)
 
-    if fcast_type == 'dual_init':
+    if fcast_type == 'mjjas':
         pred_mon_arr=  np.array([460, 461, 462, 463, 464]) - (2022 - target_yr)*12
         start_month= 5 # index of start month with January = 1
         init_month_arr= [4, 6]
     else:
-        pred_mon_arr=  np.array([461, 462, 463]) - (2022 - target_yr)*12
-        start_month= 6 # index of start month with January = 1
-        init_month_arr= [5]
+        pred_mon_arr=  np.array([462, 463, 464, 465]) - (2022 - target_yr)*12
+        start_month= 7 # index of start month with January = 1
+        init_month_arr= [7]
     
     start_year= 1984
     end_year= 2019
@@ -1295,7 +1302,10 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
                 # repeats the dynamical forecasts for the first 3/last 2 months of the fire season depending on the initialization month
                 tmpdf= clim_df[clim_df.month.isin([pred_mon_arr[indx] - 1])].drop(columns= pred_var_arr).drop(columns= 'fire_freq').reset_index(drop= True)
                 if indx== 0:
-                    tmppredarr= pred_mon_arr[0:3]
+                    if fcast_type == 'mjjas':
+                        tmppredarr= pred_mon_arr[0:3]
+                    else:
+                        tmppredarr= pred_mon_arr[0:4]
                 else:
                     tmppredarr= pred_mon_arr[3:5]
                 tmpdf= pd.concat([tmpdf.replace(pred_mon_arr[indx] - 1, m) for m in tmppredarr], ignore_index= True) 
@@ -1303,12 +1313,15 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
             
                 pred_var_tot_df= pd.DataFrame([])
                 for pred_var in pred_var_arr:
-                    seas5_anomalies_conus_regridded= seas5_monthly_anomaly_func(pred_var= pred_var, system= sys_no, fyear= target_yr, init_month= init_month_arr[indx], subarea= sub, regrid_scheme= 'bilinear', \
-                                                                                                                                                            dsout= ds_out, anom_type= 'raw')
+                    seas5_anomalies_conus_regridded= seas5_monthly_anomaly_func(pred_var= pred_var, system= sys_no, fyear= target_yr, init_month= init_month_arr[indx], \
+                                                                                subarea= sub, regrid_scheme= 'bilinear', dsout= ds_out, anom_type= 'raw')
                     seas5_anomalies_conus_regridded= seas5_anomalies_conus_regridded.interp({'lat':y_fire_grid, 'lon':x_fire_grid}, method='linear').load()
                     seas5_anomalies_conus_regridded= seas5_anomalies_conus_regridded.assign_coords({'X': (('X'), tmax_xr.X.data, {"units": "meters"}), \
                                                                                                                 'Y': (('Y'), tmax_xr.Y.data, {"units": "meters"})}).drop_vars(['lat','lon'])
-                    pred_var_df= seas5_anomalies_conus_regridded[ens_no][indx+1:4].where(~np.isnan(tmax_xr[0].drop('time'))).to_dataframe(pred_var).reset_index()[pred_var]
+                    if fcast_type == 'mjjas':
+                        pred_var_df= seas5_anomalies_conus_regridded[ens_no][indx+1:4].where(~np.isnan(tmax_xr[0].drop('time'))).to_dataframe(pred_var).reset_index()[pred_var]
+                    else:
+                        pred_var_df= seas5_anomalies_conus_regridded[ens_no][0:4].where(~np.isnan(tmax_xr[0].drop('time'))).to_dataframe(pred_var).reset_index()[pred_var]
                     pred_var_df/= pred_var_df.std() # standardizing the dynamical forecasts
                     pred_var_tot_df= pd.concat([pred_var_tot_df, pred_var_df], axis=1, ignore_index= True)
                 seas_anomalies_df= pd.concat([seas_anomalies_df, pred_var_tot_df], axis= 0, ignore_index= True)
@@ -1345,14 +1358,16 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
         mdn_freq_test_df['pred_low_2sig']= np.floor(mdn_freq_test_df['pred_low_2sig']*scale_fac)
 
         freq_loc_df= grid_ssf_freq_predict(X_test_dat= X_pred_test_df, freq_test_df= X_pred_df, n_regs= 18, ml_model= mdn_zipd, func_flag= 'zipd', pred_mon_flag= True, \
-                                                                                                                pred_mons= pred_mon_arr, loc_flag= True, rseed= 87) # df of predicted frequency locations averaged over 1000 samples
+                                                                                pred_mons= pred_mon_arr, loc_flag= True, rseed= 87) # df of predicted frequency locations averaged over 1000 samples
 
         if firemon_pred_flag == 'observations':
             mdn_freq_test_df.to_hdf('../sav_files/fire_freq_pred_dfs/mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%target_yr + '_%s.h5'%firemon_pred_flag, key= 'df', mode= 'w')
             freq_loc_df.to_hdf('../sav_files/fire_freq_pred_dfs/freq_loc_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%target_yr + '_%s.h5'%firemon_pred_flag, key= 'df', mode= 'w')
         else:
-            mdn_freq_test_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + 'mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
-            freq_loc_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + 'freq_loc_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
+            mdn_freq_test_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + '%s/'%fcast_type + 'mdn_ssf_%s'%freq_id + '_%d'%seed +  \
+                                                                                '_fire_freq_%d'%(ens_no) + '_%s'%fcast_type + '_%d.h5'%target_yr, key= 'df', mode= 'w')
+            freq_loc_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + '%s/'%fcast_type + 'freq_loc_ssf_%s'%freq_id + '_%d'%seed +  \
+                                                                                '_fire_freq_%d'%(ens_no) + '_%s'%fcast_type + '_%d.h5'%target_yr, key= 'df', mode= 'w')
         
         for freqlabel in ['pred_mean_freq', 'pred_high_2sig']: # 'pred_mean_freq', 'pred_high_2sig', 'pred_low_2sig'
             pred_loc_arr= loc_ind_ssf_func(loc_df= freq_loc_df, ml_freq_df= mdn_freq_test_df, X_test_dat= X_pred_test_df, pred_mon_flag= True, pred_mons= pred_mon_arr, freqlabel= freqlabel)
@@ -1368,8 +1383,8 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
             if firemon_pred_flag == 'observations':
                 X_pred_ur_df.to_hdf('../sav_files/ssf_pred_files/%s_dataframe'%freqlabel + '_%s'%freq_id + '_%d'%seed +  '_obs_%d.h5'%target_yr, key= 'df', mode= 'w')
             else:
-                X_pred_ur_df.to_hdf('../sav_files/ssf_pred_files/' + '%s'%firemon_pred_flag + '/%s_dataframe'%freqlabel + '_%s'%freq_id + '_%d'%seed +  '_%d'%(ens_no) +\
-                                                                                                                                             '_%d.h5'%target_yr, key= 'df', mode= 'w')
+                X_pred_ur_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + '%s/'%fcast_type + '%s_dataframe'%freqlabel + '_%s'%freq_id + '_%d'%seed + \
+                                                                                            '_%d'%(ens_no) + '_%s'%fcast_type + '_%d.h5'%target_yr, key= 'df', mode= 'w')
                         
             ## Fire size trends and locations
 
@@ -1389,5 +1404,5 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
                     reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
                                                                                                                     + '_%s'%sizelabel + '_%s.h5'%target_yr, key= 'df', mode= 'w')
                 else:
-                    reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + 'pred_size_df_ml_gpd_%s'%size_id + '_%s'%('_'.join(freqlabel.split('_')[1:])) \
-                                                                                                                + '_%s'%sizelabel + '_%d'%(ens_no) + '_%s.h5'%target_yr, key= 'df', mode= 'w')
+                    reg_gpd_ml_pred_size_df.to_hdf('../sav_files/fire_size_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + '%s/'%fcast_type + 'pred_size_df_ml_gpd_%s'%size_id + \
+                            '_%s'%('_'.join(freqlabel.split('_')[1:])) + '_%s'%sizelabel + '_%d'%(ens_no) +  '_%s.h5'%target_yr, key= 'df', mode= 'w')
