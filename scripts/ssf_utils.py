@@ -533,7 +533,7 @@ def fire_prob_pred_func(freq_id= None, seed= None, X_tot_df= None, X_test_df= No
     else:
         return pred_prob_xarr
     
-def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, fmon= 5, fire_df= None, firemon_pred_flag= 'observations', ens_no= None, pred_fire_df= None):
+def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, fmon= 5, fire_df= None, firemon_pred_flag= 'observations', fcast_type= 'mjjas', ens_no= None, pred_fire_df= None):
     """
     Function to rescale predicted fire probability with climatological baseline fire probability and observed number of fires
 
@@ -542,6 +542,7 @@ def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, f
     fmon: month for which predictions are made;  January --> 0, February --> 1, ..., June --> 5 etc.
     fire_df: dataframe containing observed number of fires
     firemon_pred_flag: flag to indicate whether predictions are made for observations, dynamical forecasts or statistical forecasts
+    fcast_type: month range of dynamical forecast
     ens_no: ensemble member number for dynamical or statistical forecasts
     pred_fire_df: dataframe containing predicted fire probability
     """
@@ -550,8 +551,10 @@ def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, f
         pred_prob_xarr= xarray.open_dataarray('../sav_files/ssf_pred_files/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'obs_%s.nc'%plot_yr)
         n_fires_yr= len(fire_df[fire_df['fire_month'] == (plot_yr - 1984)*12 + fmon])
     elif firemon_pred_flag == 'dynamical_forecasts':
-        pred_prob_xarr= xarray.open_dataarray('../sav_files/ssf_pred_files/dynamical_forecasts/%s'%plot_yr + '/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%plot_yr)
-        pred_fire_df= pd.read_hdf('../sav_files/fire_freq_pred_dfs/dynamical_forecasts/%s'%plot_yr + '/mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%ens_no + '_%d.h5'%plot_yr)
+        pred_prob_xarr= xarray.open_dataarray('../sav_files/ssf_pred_files/dynamical_forecasts/' + '%s/'%plot_yr + '%s/'%fcast_type + 'pred_prob_xarr_%s'%freq_id + \
+                                                                                                            '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%plot_yr)
+        pred_fire_df= pd.read_hdf('../sav_files/fire_freq_pred_dfs/dynamical_forecasts/' + '%s/'%plot_yr + '%s/'%fcast_type + 'mdn_ssf_%s'%freq_id + '_%d'%seed + \
+                                                                                                                 '_fire_freq_%d'%ens_no + '_%d.h5'%plot_yr)
         if fmon == 9:
             n_fires_yr= 11
         else:
@@ -563,7 +566,7 @@ def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, f
     #baseline_arr= np.arange(209, 426, 12)
     #n_fires_baseline= len(fire_df[fire_df['fire_month'].isin(baseline_arr + (fmon - 5))])/20
     baseline_arr= baseline_mon_arr_func(start_yr= 2001, end_yr= 2019, mindx= smon).values
-    n_fires_baseline= len(fire_df[fire_df['fire_month'].isin(baseline_arr + (fmon - smon))])/20
+    n_fires_baseline= len(fire_df[fire_df['fire_month'].isin(baseline_arr + (fmon - smon))])/20 #20 --> number of years
 
     pred_prob_baseline= xarray.open_dataarray('../sav_files/ssf_pred_files/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'obs_baseline.nc')
     #pred_prob_xarr_baseline= pred_prob_baseline[pred_prob_baseline.time.isin(baseline_mon_arr_func(start_yr= 2001, end_yr= 2019, mindx= (fmon + 1)).values), :, :].mean(dim= 'month')
@@ -573,7 +576,7 @@ def mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, f
     pred_prob_xarr_baseline= pred_prob_baseline[pred_prob_baseline.time.isin(baseline_mon_arr_func(start_yr= 2001, end_yr= 2019, mindx= fmon).values), :, :].mean(dim= 'month')
     return 10**(np.log10(pred_prob_xarr[(fmon - smon), :, :]) - np.log10(pred_prob_xarr_baseline) - np.log10(n_fires_baseline/n_fires_yr))
 
-def ens_mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, fmon= 5, fire_df= None, firemon_pred_flag= 'dynamical_forecasts', statistic= 'mean'):
+def ens_mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 4, fmon= 5, fire_df= None, firemon_pred_flag= 'dynamical_forecasts', fcast_type= 'mjjas', statistic= 'mean'):
     """
     Function to rescale predicted fire probability with climatological baseline fire probability and observed number of fires
 
@@ -583,14 +586,16 @@ def ens_mon_fire_prob_pred(freq_id= '08_07_23', seed= 654, plot_yr= 2019, smon= 
     fmon: month for which predictions are made;  January --> 0, February --> 1, ..., June --> 5 etc.
     fire_df: dataframe containing observed number of fires
     firemon_pred_flag: flag to indicate whether predictions are made for observations, dynamical forecasts or statistical forecasts
+    fcast_type: month range of dynamical forecast
     """
     
     if firemon_pred_flag == 'dynamical_forecasts':
-        ens_pred_prob_xarr= xarray.concat([xarray.open_dataarray('../sav_files/ssf_pred_files/dynamical_forecasts/%s'%plot_yr + '/pred_prob_xarr_%s'%freq_id + '_%d_'%seed + \
-                                                                                            'df_%d'%ens_no + '_%s.nc'%plot_yr) for ens_no in range(51)], dim= 'ens_no')
+        ens_pred_prob_xarr= xarray.concat([xarray.open_dataarray('../sav_files/ssf_pred_files/dynamical_forecasts/' + '%s/'%plot_yr + '%s/'%fcast_type + \
+                                            'pred_prob_xarr_%s'%freq_id + '_%d_'%seed + 'df_%d'%ens_no + '_%s.nc'%plot_yr) for ens_no in range(51)], dim= 'ens_no')
         mdn_tot_df= pd.DataFrame([])
         for ens_no in range(51):
-            mdn_tmp_df= pd.read_hdf('../sav_files/fire_freq_pred_dfs/dynamical_forecasts/%s'%plot_yr + '/mdn_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%ens_no + '_%d.h5'%plot_yr)
+            mdn_tmp_df= pd.read_hdf('../sav_files/fire_freq_pred_dfs/dynamical_forecasts/' + '%s/'%plot_yr + '%s/'%fcast_type + 'mdn_ssf_%s'%freq_id + '_%d'%seed +  \
+                                                                                                                            '_fire_freq_%d'%ens_no + '_%d.h5'%plot_yr)
             mdn_tot_df= pd.concat([mdn_tot_df, mdn_tmp_df], axis= 0)
         pred_fire_df= mdn_tot_df.groupby(mdn_tot_df.index).mean().round().astype(int)
         if statistic == 'mean':
@@ -1340,8 +1345,8 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
         
         ## Function to generate a spatial map of fire probability forecasts from a saved MDN model and save the resultant xarray for post-processing
 
-        fire_prob_pred_func(freq_id= freq_id, seed= seed, X_tot_df= X_pred_ur_df, X_test_df= X_pred_test_df, pred_mon_arr= pred_mon_arr, sav_flag= True, target_year= target_yr, \
-                                                                                                                            firemon_pred_flag= firemon_pred_flag, ens_no= (ens_no))
+        fire_prob_pred_func(freq_id= freq_id, seed= seed, X_tot_df= X_pred_ur_df, X_test_df= X_pred_test_df, pred_mon_arr= pred_mon_arr, fcast_type= fcast_type, 
+                                                        sav_flag= True, target_year= target_yr, firemon_pred_flag= firemon_pred_flag, ens_no= (ens_no))
         
         ## Fire frequency trends and locations
 
@@ -1365,9 +1370,9 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
             freq_loc_df.to_hdf('../sav_files/fire_freq_pred_dfs/freq_loc_ssf_%s'%freq_id + '_%d'%seed +  '_fire_freq_%d'%target_yr + '_%s.h5'%firemon_pred_flag, key= 'df', mode= 'w')
         else:
             mdn_freq_test_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + '%s/'%fcast_type + 'mdn_ssf_%s'%freq_id + '_%d'%seed +  \
-                                                                                '_fire_freq_%d'%(ens_no) + '_%s'%fcast_type + '_%d.h5'%target_yr, key= 'df', mode= 'w')
+                                                                                '_fire_freq_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
             freq_loc_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + '%s/'%fcast_type + 'freq_loc_ssf_%s'%freq_id + '_%d'%seed +  \
-                                                                                '_fire_freq_%d'%(ens_no) + '_%s'%fcast_type + '_%d.h5'%target_yr, key= 'df', mode= 'w')
+                                                                                '_fire_freq_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
         
         for freqlabel in ['pred_mean_freq', 'pred_high_2sig']: # 'pred_mean_freq', 'pred_high_2sig', 'pred_low_2sig'
             pred_loc_arr= loc_ind_ssf_func(loc_df= freq_loc_df, ml_freq_df= mdn_freq_test_df, X_test_dat= X_pred_test_df, pred_mon_flag= True, pred_mons= pred_mon_arr, freqlabel= freqlabel)
@@ -1384,7 +1389,7 @@ def fire_activity_ensemble_ssf(tot_ens_mems= 51, target_yr= 2022, firemon_pred_f
                 X_pred_ur_df.to_hdf('../sav_files/ssf_pred_files/%s_dataframe'%freqlabel + '_%s'%freq_id + '_%d'%seed +  '_obs_%d.h5'%target_yr, key= 'df', mode= 'w')
             else:
                 X_pred_ur_df.to_hdf('../sav_files/fire_freq_pred_dfs/' + '%s/'%firemon_pred_flag + '%s/'%target_yr + '%s/'%fcast_type + '%s_dataframe'%freqlabel + '_%s'%freq_id + '_%d'%seed + \
-                                                                                            '_%d'%(ens_no) + '_%s'%fcast_type + '_%d.h5'%target_yr, key= 'df', mode= 'w')
+                                                                                            '_%d'%(ens_no) + '_%d.h5'%target_yr, key= 'df', mode= 'w')
                         
             ## Fire size trends and locations
 
